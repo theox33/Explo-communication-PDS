@@ -38,12 +38,15 @@ La première étape est donc d'ouvrir *(créer)* un socket côté serveur.
 ## Créer un socket
 
 ```c
-int socket_desc;
-struct sockaddr_in server;
+int server_socket;
+struct sockaddr_in server_address;
 	
 // Créer un socket
-socket_desc = socket(AF_INET , SOCK_STREAM , 0);
-if (socket_desc == -1) printf("Could not create socket");
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1) {
+        perror("Erreur lors de la création du socket");
+        exit(EXIT_FAILURE);
+    }
 ```
 
 La fonction `socket()` crée un socket et retourne un descripteur qui sera utilisé par d'autres fonctions. Le code ci-dessus créera un socket avec les propriétés suivantes :
@@ -68,17 +71,19 @@ socket_desc = socket(AF_INET , SOCK_STREAM , 0);
 if (socket_desc == -1) printf("Could not create socket");
 
 // Préparer la structure sockaddr_in
-server.sin_family = AF_INET;
-server.sin_addr.s_addr = INADDR_ANY;
-server.sin_port = htons(8888);
+server_address.sin_family = AF_INET;
+server_address.sin_addr.s_addr = INADDR_ANY;
+server_address.sin_port = htons(8888);
 
 // Lier le socket
-if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) 
-    puts("bind failed");
-puts("bind done");
+if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
+        perror("Erreur lors de la liaison du socket");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
 ```
 
-La structure `sockaddr_in` est utilisée pour stocker les informations relatives à l'adresse du socket.
+La structure `sockaddr` est utilisée pour stocker les informations relatives à l'adresse du socket.
 
 `server.sin_family = AF_INET;`
 Définit la famille d'adresses à AF_INET, ce qui signifie que nous utilisons le protocole IPv4.
@@ -93,12 +98,9 @@ Définit le port sur lequel le serveur écoutera les connexions.
 
 La fonction bind est utilisée pour associer le socket à une adresse IP et un port spécifiques.
 
-`if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) 
-    puts("bind failed");` Tente de lier le socket à l'adresse et au port définis dans la structure server.
-Si bind échoue (retourne une valeur négative), un message "bind failed" est affiché.
-
-`puts("bind done");`
-Si bind réussit, un message "bind done" est affiché pour indiquer que l'association a été effectuée avec succès.
+`if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1)`
+Tente de lier le socket à l'adresse et au port définis dans la structure server.
+Si bind échoue (retourne une valeur négative), un message `perror` est affiché.
 
 > [!WARNING]
 > Il faut faire attention à l'attribution du port dans cette étape. Il y a en effet des ports déjà utilisés par le système tels que 22 pour ssh, 443 pour https, 80 pour http... 8888 n'étant pas utilisé par autre chose à ce moment, il est bon candidat. Il faudra faire attention à ne pas réutiliser ce port pour autre chose à l'avenir.
@@ -114,45 +116,44 @@ Après avoir lié un socket à un port de connexion *(ici, 8888)*, il faut écou
 La fonction `listen` permet au socket de se mettre en mode écoute : 
 ```c
 // Listen
-listen(socket_desc , 3);
+listen(server_socket , 5);
 ```
 
 ## Accepter une connexion
 La fonction `accept`  extrait la première demande de connexion de la file d'attente des connexions en attente pour le socket d'écoute. `sockfd`, crée un nouveau socket connecté et retourne un nouveau descripteur de fichier faisant référence à ce socket. Le socket nouvellement créé n'est pas dans l'état d'écoute. Le socket original sockfd n'est pas affecté par cet appel.
 
 ```c
-//Accept and incoming connection
-	puts("Waiting for incoming connections...");
-	c = sizeof(struct sockaddr_in);
-	new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
-	if (new_socket<0) perror("accept failed");
-	
-	puts("Connection accepted");
+printf("Serveur en attente de connexions sur le port %d...\n", PORT);
 
-	return 0;
+        // Accepter la connexion d'un client
+        client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_address_len);
+        if (client_socket == -1) {
+            perror("Erreur lors de l'acceptation de la connexion");
+            close(server_socket);
+            exit(EXIT_FAILURE);
+        }
 ```
 
 Ici,
 
 ```c
-c = sizeof(struct sockaddr_in);
-```
-initialise la variable c avec la taille de la structure sockaddr_in, qui stocke les informations sur le client (adresse IP et port).
-
-```c
-new_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
+client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_address_len);
 ```
 Acceptation d'une connexion entrante :
 
-- La fonction `accept()` extrait une connexion en attente de la file d'attente du socket d'écoute socket_desc.
-- Elle crée un nouveau socket connecté (`new_socket`) qui permettra de communiquer avec le client.
-- Le second paramètre `(struct sockaddr *)&client` permet de stocker l'adresse du client.
-- Le troisième paramètre `(socklen_t*)&c` transmet la taille de la structure `sockaddr_in` (obligatoire pour certaines implémentations de `accept()`).
+- La fonction `accept()` extrait une connexion en attente de la file d'attente du socket d'écoute server_socket.
+- Elle crée un nouveau socket connecté (`client_socket`) qui permettra de communiquer avec le client.
+- Le second paramètre `(struct sockaddr *)&client_address` permet de stocker l'adresse du client.
+- Le troisième paramètre `&client_address_len` transmet la taille de la structure `sockaddr` (obligatoire pour certaines implémentations de `accept()`).
 
 ```c
-if (new_socket<0) perror("accept failed");
+if (client_socket == -1) {
+            perror("Erreur lors de l'acceptation de la connexion");
+            close(server_socket);
+            exit(EXIT_FAILURE);
+        }
 ```
-Vérifie si `accept()` a échoué (`new_socket < 0`) et affiche un message d'erreur avec `perror()`.
+Vérifie si `accept()` a échoué, affiche un message d'erreur avec `perror()` et ferme le socket.
 
 -------------------
 
