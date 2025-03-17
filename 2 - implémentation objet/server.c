@@ -12,7 +12,7 @@
 #include "connection.h"
 #include "protocol.h"
 
-#define PORT 12345
+#define PORT 5001
 #define MAX_CLIENTS 10
 
 typedef struct {

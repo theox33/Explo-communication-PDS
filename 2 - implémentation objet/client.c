@@ -12,8 +12,8 @@
 #include "connection.h"
 #include "protocol.h"
 
-#define SERVER_IP "127.0.0.1"  // Update to actual server IP
-#define PORT 12345
+#define SERVER_IP "172.17.0.1"  // Update to actual server IP
+#define PORT 5001
 #define BUFFER_SIZE 1024
 
 Connection* connection = NULL;
