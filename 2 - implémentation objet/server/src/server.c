@@ -8,9 +8,9 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "communication.h"
-#include "connection.h"
-#include "protocol.h"
+#include "../../common/communication.h"
+#include "../../common/connection.h"
+#include "../../common/protocol.h"
 
 #define PORT 5001
 #define MAX_CLIENTS 10

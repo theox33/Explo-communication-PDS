@@ -8,11 +8,11 @@
 #include <errno.h>
 #include <sys/time.h>  // Pour struct timeval
 #include <sys/select.h>  // Pour fd_set
-#include "communication.h"
-#include "connection.h"
-#include "protocol.h"
+#include "../../common/communication.h"
+#include "../../common/connection.h"
+#include "../../common/protocol.h"
 
-#define SERVER_IP "172.17.0.1"  // Update to actual server IP
+#define SERVER_IP "172.21.10.187"  // Update to actual server IP
 #define PORT 5001
 #define BUFFER_SIZE 1024
 
