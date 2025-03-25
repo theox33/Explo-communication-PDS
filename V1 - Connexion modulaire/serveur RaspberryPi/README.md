@@ -25,7 +25,7 @@
 Ce projet implémente un système de communication client-serveur en langage C où :
 - Le serveur peut accepter et gérer plusieurs connexions clients simultanément
 - Les clients peuvent envoyer des messages au serveur
-- Le serveur peut traiter ces messages et envoyer des réponses
+- Le serveur peut traiter ces messages et les renvoyer
 - La communication est bidirectionnelle et asynchrone
 - Le système est conçu de manière modulaire avec une séparation claire des responsabilités
 ## Architecture
