@@ -12,7 +12,7 @@
 #include "../../common/connection.h"
 #include "../../common/protocol.h"
 
-#define SERVER_IP "172.21.10.187"  // Update to actual server IP
+#define SERVER_IP "172.23.3.21"  // Update to actual server IP
 #define PORT 5001
 #define BUFFER_SIZE 1024
 

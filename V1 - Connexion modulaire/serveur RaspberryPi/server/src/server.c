@@ -37,7 +37,7 @@ void message_handler(const char* cmd, const char* param) {
     fflush(stdout);
 
     if (strcmp(cmd, "CMD_X") == 0) {
-        printf("Client says: %s\n", param);
+        printf("Client %d says: %s\n", tid, param);
         
         // Echo message back to all clients (optional)
         pthread_mutex_lock(&clients_mutex);
