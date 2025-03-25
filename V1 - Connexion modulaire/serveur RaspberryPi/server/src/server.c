@@ -13,7 +13,7 @@
 #include "../../common/protocol.h"
 
 #define PORT 5001
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 2
 
 typedef struct {
     int client_socket;
