@@ -1,0 +1,15 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="Theme.Serverclient" parent="Base.Theme.Serverclient" />
+
+    <color name="colorPrimary">#FFFFFF</color>
+    <color name="colorAccent">#2196F3</color>
+    <color name="colorPrimaryDark">#868686</color>
+</resources>
