@@ -23,11 +23,11 @@ Ces bibliothèques standard fournissent toutes les primitives nécessaires pour 
 - `signal.h` permet de gérer l'arrêt propre quand l'utilisateur appuie sur Ctrl+C
 ```c
 #define PORT 5001           // Port d'écoute du serveur
-#define MAX_CLIENTS 10      // Nombre maximum de clients simultanés
+#define MAX_CLIENTS 2      // Nombre maximum de clients simultanés
 ```
 Ces constantes définissent:
 - Le port utilisé par le serveur (5001) - doit être supérieur à 1024 pour être utilisé sans privilèges root
-- La limite de clients simultanés (10) - limite les ressources système utilisées
+- La limite de clients simultanés (2) - limite les ressources système utilisées
 ## 3. Structure des données client
 ```c
 typedef struct {
@@ -51,7 +51,7 @@ int running_server = 1;          // Indicateur d'état du serveur
 Ces variables globales sont essentielles pour la coordination entre les threads:
 - Les tableaux `server_connections` et `server_communications` stockent les objets de connexion pour chaque client. L'initialisation à `NULL` indique qu'aucun client n'est connecté initialement.
 - `clients_mutex` est crucial pour éviter les conflits d'accès aux tableaux partagés lorsque plusieurs threads (clients) tentent de les modifier simultanément.
-- `running_server` agit comme un drapeau global permettant d'arrêter proprement tous les threads lors de la fermeture du serveur.
+- `running_server` agit comme un flag global permettant d'arrêter proprement tous les threads lors de la fermeture du serveur.
 ## 5. Gestionnaire de messages
 ```c
 void message_handler(const char* cmd, const char* param) {
@@ -287,14 +287,7 @@ Cette partie:
   - Le paramètre 5 indique la taille de la file d'attente des connexions entrantes
   - Les connections supplémentaires seront refusées si la file est pleine
 - Vérifie les erreurs à chaque étape et sort proprement en cas d'échec
-```c
-    printf("Server started on port %d\nWaiting for client connections...\n", PORT);
-    fflush(stdout);
-```
-Cette ligne:
-- Informe l'utilisateur que le serveur est en cours d'exécution
-- Spécifie le port d'écoute pour faciliter les tests
-- Force l'affichage immédiat du message avec `fflush()`
+
 ```c
     // Boucle principale - acceptation et gestion des clients
     while (running_server) {
@@ -405,12 +398,3 @@ La dernière partie:
 Enfin, après la boucle:
 - Ferme le socket principal du serveur
 - Retourne 0 pour indiquer une terminaison réussie
-## 9. Synthèse des concepts clés
-Le fichier `server.c` illustre plusieurs concepts importants de la programmation réseau et concurrente:
-1. **Socket TCP/IP**: Utilisation de sockets pour établir des connexions réseau.
-2. **Programmation concurrente**: Un thread principal accepte les connexions tandis que des threads séparés gèrent chaque client.
-3. **Synchronisation**: Utilisation de mutex pour protéger les ressources partagées.
-4. **Gestion des signaux**: Capture de SIGINT pour permettre un arrêt propre.
-5. **Gestion des ressources**: Allocation et libération méthodiques de la mémoire et autres ressources.
-6. **Architecture modulaire**: Séparation des responsabilités entre connexion, protocole et communication.
-Ce serveur peut être utilisé comme base pour développer des applications client-serveur plus complexes en étendant le protocole et en ajoutant des fonctionnalités spécifiques.
