@@ -79,10 +79,9 @@ Le projet est composé de plusieurs fichiers Java qui assurent la connexion rés
 - **Port** : `5001`.
 
 ## Améliorations possibles
-- Ajouter une gestion avancée des erreurs.
-- Implémenter une interface plus interactive.
-- Supporter d'autres types de messages (JSON, XML, etc.).
-
+- A terme il y aura deux applications Android
+- Il peut être judicieux d'utiliser une librairie pour les fichiers communs aux deux applis ( voir Matthias BRUN pour aide)
+- Il nous reste l'implémentation du chiffrement TLS afin de sécuriser la communication
 ---
 
 📌 **Auteur** : Théo et Alexis  
