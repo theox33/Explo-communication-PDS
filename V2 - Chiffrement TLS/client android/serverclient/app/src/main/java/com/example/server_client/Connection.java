@@ -1,34 +1,25 @@
 package com.example.server_client;
-
 import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
+import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 public class Connection {
     private static final String TAG = "Connection";
     private static final int CONNECT_TIMEOUT = 5000; // 5 seconds
-    private SSLSocket socket;
+    private Socket socket;
     private AtomicBoolean connected = new AtomicBoolean(false);
     private InputStream inputStream;
     private OutputStream outputStream;
-
     public boolean connect(String ip, int port) {
         try {
             Log.d(TAG, "Connecting to " + ip + ":" + port);
-            // Use SSLSocketFactory to create an SSL socket instead of a plain Socket
-            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            socket = (SSLSocket) factory.createSocket();
+            socket = new Socket();
             socket.connect(new InetSocketAddress(ip, port), CONNECT_TIMEOUT);
 
-            // Optional: You can enforce specific TLS protocols if needed:
-            // socket.setEnabledProtocols(new String[] {"TLSv1.2"});
-
-            // Enable TCP keepalive and set a read timeout
+            // Enable TCP keepalive
             socket.setKeepAlive(true);
             socket.setSoTimeout(2000); // 2 second read timeout
 
@@ -44,7 +35,6 @@ public class Connection {
             return false;
         }
     }
-
     public int read(byte[] buffer, int maxLength) {
         if (!connected.get() || inputStream == null) {
             return -1;
@@ -57,14 +47,15 @@ public class Connection {
                     (e.getMessage().contains("timed out") ||
                             e.getMessage().contains("EAGAIN") ||
                             e.getMessage().contains("EWOULDBLOCK"))) {
+                // Timeout, not an error
                 return 0;
             }
+
             Log.e(TAG, "Read failed: " + e.getMessage(), e);
             connected.set(false);
             return -1;
         }
     }
-
     public boolean write(byte[] data, int length) {
         if (!connected.get() || outputStream == null) {
             return false;
@@ -80,7 +71,6 @@ public class Connection {
             return false;
         }
     }
-
     public void close() {
         connected.set(false);
         try {
@@ -91,7 +81,6 @@ public class Connection {
             Log.e(TAG, "Error closing socket: " + e.getMessage(), e);
         }
     }
-
     public boolean isConnected() {
         return connected.get() && socket != null && socket.isConnected() && !socket.isClosed();
     }

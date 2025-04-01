@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "protocol.h": "c"
+        "protocol.h": "c",
+        "communication.h": "c"
     }
 }
