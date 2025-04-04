@@ -32,7 +32,7 @@ public class MainActivity extends AppCompatActivity {
         mainHandler = new Handler(Looper.getMainLooper());
 
         // Create client instance
-        client = new Client();
+        client = new Client(this);
         client.setMessageListener(new Client.MessageListener() {
             @Override
             public void onMessageReceived(final String message) {

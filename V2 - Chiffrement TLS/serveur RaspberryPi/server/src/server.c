@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "../.env"
 
 
 #include <openssl/ssl.h>
@@ -17,6 +16,7 @@
 #include "../../common/communication.h"
 #include "../../common/connection.h"
 #include "../../common/protocol.h"
+#include "./parser.h"
 
 #define PORT 5001
 #define MAX_CLIENTS 2
@@ -86,6 +86,7 @@ void* client_handler(void* arg) {
         return NULL;
     }
     SSL_set_fd(ssl, client_socket);
+    // After successful SSL_accept in client_handler:
     if (SSL_accept(ssl) <= 0) {
         ERR_print_errors_fp(stderr);
         SSL_free(ssl);
@@ -93,6 +94,10 @@ void* client_handler(void* arg) {
         free(client_info);
         return NULL;
     }
+
+    // Retrieve and log the cipher suite used for the connection
+    const char* cipher = SSL_get_cipher(ssl);
+    printf("SSL connection established with cipher: %s\n", cipher);
     // Save the SSL pointer in the connection so that our read/write functions use it.
     connection->ssl = ssl;
     // ********************************
@@ -164,10 +169,12 @@ void signal_sigint_handler(int signal) {
 }
 
 int main() {
-    const char *cert_path = getenv("CERT_PATH");
-    const char *key_path = getenv("KEY_PATH");
+    load_env_file(".env");
+    // Load environment variables
+    const char *cert_path = get_env_value("CERT_PATH");
+    const char *key_path = get_env_value("KEY_PATH");
     if (!cert_path && !key_path) {
-        fprintf(stderr, "Please set the CERT_PATH and KEY_PATH environment variables.\n");
+        fprintf(stderr, "Missing CERT_PATH and KEY_PATH environment variables.\n");
         exit(EXIT_FAILURE);
     }
 

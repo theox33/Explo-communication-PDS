@@ -2,3 +2,5 @@ build/
 bin/
 raspiserver/
 .env
+server.crt
+server.key

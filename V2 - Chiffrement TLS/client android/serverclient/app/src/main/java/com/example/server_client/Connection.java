@@ -1,31 +1,49 @@
 package com.example.server_client;
+
+import android.content.Context;
 import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.Socket;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 public class Connection {
     private static final String TAG = "Connection";
     private static final int CONNECT_TIMEOUT = 5000; // 5 seconds
-    private Socket socket;
+    private SSLSocket socket;
     private AtomicBoolean connected = new AtomicBoolean(false);
     private InputStream inputStream;
     private OutputStream outputStream;
+    private Context context; // Pour accéder aux ressources assets
+
+
+    public Connection(Context context) {
+        this.context = context;
+    }
+
     public boolean connect(String ip, int port) {
         try {
             Log.d(TAG, "Connecting to " + ip + ":" + port);
-            socket = new Socket();
+            SSLSocketFactory factory = SSLUtil.getSocketFactory(context);
+            socket = (SSLSocket) factory.createSocket();
             socket.connect(new InetSocketAddress(ip, port), CONNECT_TIMEOUT);
 
-            // Enable TCP keepalive
+            // Optional: enforce TLS version if necessary
+            // socket.setEnabledProtocols(new String[] {"TLSv1.2"});
+
             socket.setKeepAlive(true);
             socket.setSoTimeout(2000); // 2 second read timeout
 
             inputStream = socket.getInputStream();
             outputStream = socket.getOutputStream();
             connected.set(true);
+
+            // Retrieve and log the cipher suite used for the connection
+            String cipherSuite = socket.getSession().getCipherSuite();
+            Log.d(TAG, "SSL connection established with cipher: " + cipherSuite);
 
             Log.d(TAG, "Connected successfully");
             return true;
@@ -35,6 +53,8 @@ public class Connection {
             return false;
         }
     }
+
+
     public int read(byte[] buffer, int maxLength) {
         if (!connected.get() || inputStream == null) {
             return -1;
@@ -47,15 +67,14 @@ public class Connection {
                     (e.getMessage().contains("timed out") ||
                             e.getMessage().contains("EAGAIN") ||
                             e.getMessage().contains("EWOULDBLOCK"))) {
-                // Timeout, not an error
                 return 0;
             }
-
             Log.e(TAG, "Read failed: " + e.getMessage(), e);
             connected.set(false);
             return -1;
         }
     }
+
     public boolean write(byte[] data, int length) {
         if (!connected.get() || outputStream == null) {
             return false;
@@ -71,6 +90,7 @@ public class Connection {
             return false;
         }
     }
+
     public void close() {
         connected.set(false);
         try {
@@ -81,6 +101,7 @@ public class Connection {
             Log.e(TAG, "Error closing socket: " + e.getMessage(), e);
         }
     }
+
     public boolean isConnected() {
         return connected.get() && socket != null && socket.isConnected() && !socket.isClosed();
     }

@@ -1,5 +1,7 @@
 package com.example.server_client;
+import android.content.Context;
 import android.util.Log;
+
 public class Client {
     private static final String TAG = "Client";
     private static final String SERVER_IP = "192.168.1.2"; // Update to your server IP
@@ -16,8 +18,9 @@ public class Client {
 
     private MessageListener messageListener;
 
-    public Client() {
-        connection = new Connection();
+    // Update constructor to accept a Context parameter
+    public Client(Context context) {
+        connection = new Connection(context);
         protocol = new Protocol();
         communication = new Communication(connection, protocol);
 
