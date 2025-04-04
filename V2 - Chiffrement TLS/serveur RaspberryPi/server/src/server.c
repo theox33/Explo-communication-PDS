@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "../.env"
 
 
 #include <openssl/ssl.h>
@@ -163,6 +164,13 @@ void signal_sigint_handler(int signal) {
 }
 
 int main() {
+    const char *cert_path = getenv("CERT_PATH");
+    const char *key_path = getenv("KEY_PATH");
+    if (!cert_path && !key_path) {
+        fprintf(stderr, "Please set the CERT_PATH and KEY_PATH environment variables.\n");
+        exit(EXIT_FAILURE);
+    }
+
     signal(SIGINT, signal_sigint_handler);
     struct sockaddr_in server_address;
     
@@ -189,11 +197,11 @@ int main() {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
-    if (SSL_CTX_use_certificate_file(ssl_ctx, "server.crt", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ssl_ctx, cert_path, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
-    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, "server.key", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, key_path, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
