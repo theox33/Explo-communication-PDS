@@ -24,70 +24,70 @@ static void* communication_thread_function(void* arg) {
     int consecutive_empty_reads = 0;
     const int max_consecutive_empty_reads = 5;
     
-    printf("Communication thread started\n");
+    printf("Thread de communication démarré\n");
     
     while (comm->running) {
-        // Clear buffers before each read
+        // Effacer les tampons avant chaque lecture
         memset(buffer, 0, BUFFER_SIZE);
         
         ssize_t bytes_read = comm->connection->read(comm->connection, buffer, BUFFER_SIZE - 1);
         
         if (bytes_read > 0) {
-            // Reset empty read counter on successful data reception
+            // Réinitialiser le compteur de lectures vides après réception de données
             consecutive_empty_reads = 0;
             
-            // Ensure null termination
+            // S'assurer de la terminaison nulle
             buffer[bytes_read] = '\0';
-            printf("Raw data received: '%s'\n", buffer);
+            printf("Données brutes reçues : '%s'\n", buffer);
             
-            // Clear command and parameter buffers
+            // Effacer les tampons de commande et de paramètre
             memset(cmd, 0, MAX_CMD_SIZE);
             memset(param, 0, MAX_PARAM_SIZE);
             
-            // Process the message
+            // Traiter le message
             comm->protocol->decodeMessage(comm->protocol, buffer, cmd, param);
             
-            // Call the message handler if set
+            // Appeler le gestionnaire de messages s'il est défini
             if (comm->messageHandler) {
-                comm->messageHandler(cmd, param);
+                comm->messageHandler(cmd, param, comm->client_id);
             }
         } else if (bytes_read == 0) {
-            // No data available
+            // Aucune donnée disponible
             consecutive_empty_reads++;
             
-            // Check if connection was marked as closed during read
+            // Vérifier si la connexion a été marquée comme fermée pendant la lecture
             if (!comm->connection->connected) {
-                printf("Connection closed by peer (normal)\n");
+                printf("Connexion fermée par le pair (normal)\n");
                 break;
             }
             
-            // If we've had too many consecutive empty reads, check connection
+            // Si trop de lectures vides consécutives, vérifier la connexion
             if (consecutive_empty_reads > max_consecutive_empty_reads) {
-                // Try a zero-byte probe to test connection
+                // Essayer une sonde de 0 octet pour tester la connexion
                 char probe_buffer[1];
                 ssize_t probe_result = send(comm->connection->socket_fd, probe_buffer, 0, MSG_NOSIGNAL);
                 
                 if (probe_result < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-                    // Connection is likely broken
-                    printf("Connection appears broken after multiple empty reads\n");
+                    // La connexion est probablement rompue
+                    printf("La connexion semble rompue après plusieurs lectures vides\n");
                     comm->connection->connected = 0;
                     break;
                 }
                 
-                // Reset counter after connection check
+                // Réinitialiser le compteur après vérification de la connexion
                 consecutive_empty_reads = 0;
             }
         } else {
-            // Actual error occurred in read
-            printf("Read error, terminating communication thread\n");
+            // Une erreur réelle s'est produite lors de la lecture
+            printf("Erreur de lecture, arrêt du thread de communication\n");
             break;
         }
         
-        // Small delay to prevent CPU hogging on busy loop
-        usleep(50000);  // 50ms delay
+        // Petit délai pour éviter une boucle occupée qui consomme trop de CPU
+        usleep(50000);  // Délai de 50ms
     }
     
-    printf("Communication thread exiting\n");
+    printf("Fin du thread de communication\n");
     return NULL;
 }
 
@@ -117,7 +117,7 @@ Communication* Communication_create(Connection* connection, Protocol* protocol) 
         comm->thread = 0;
         comm->messageHandler = NULL;
         
-        // Assign method pointers
+        // Assigner les pointeurs de méthode
         comm->comX = Communication_comX;
         comm->comY = Communication_comY;
         comm->run = Communication_run;
@@ -129,12 +129,12 @@ Communication* Communication_create(Connection* connection, Protocol* protocol) 
 
 void Communication_destroy(Communication* comm) {
     if (comm) {
-        // Stop the communication thread
+        // Arrêter le thread de communication
         if (comm->running) {
             comm->stop(comm);
         }
         
-        // Don't destroy connection and protocol here as they might be shared
+        // Ne pas détruire la connexion et le protocole ici car ils peuvent être partagés
         free(comm);
     }
 }

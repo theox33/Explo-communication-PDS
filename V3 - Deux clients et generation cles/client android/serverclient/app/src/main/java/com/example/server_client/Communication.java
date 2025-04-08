@@ -32,7 +32,7 @@ public class Communication {
 
     public void comY(String param) {
         byte[] message = protocol.encodeMessage(Protocol.CMD_Y, param);
-        connection.write(message, message.length);
+        connection.write(message, message.length);connection.write(message, message.length);
     }
 
     public void run() {

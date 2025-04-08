@@ -13,6 +13,10 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+
 #include "../../common/communication.h"
 #include "../../common/connection.h"
 #include "../../common/protocol.h"
@@ -27,6 +31,12 @@ typedef struct {
     int id;
 } ClientInfo;
 
+// Structure to track clients IDs with their communication objects
+typedef struct {
+    int id;
+    Communication* comm;
+} ClientMapping;
+
 // Global TLS context pointer
 SSL_CTX* ssl_ctx = NULL;
 
@@ -37,25 +47,31 @@ int server_socket;
 int running_server = 1;
 
 // Message handler with improved debugging
-void message_handler(const char* cmd, const char* param) {
+void message_handler(const char* cmd, const char* param, int sender_id) {
     pthread_t tid = pthread_self();
-    printf("Thread %lu received: Command='%s', Param='%s'\n", 
-           (unsigned long)tid, cmd, param);
+    printf("Thread %lu (client %d) received: Command='%s', Param='%s'\n", 
+           (unsigned long)tid, sender_id, cmd, param);
     fflush(stdout);
 
     if (strcmp(cmd, "CMD_X") == 0) {
-        printf("Client %lu says: %s\n", (unsigned long)tid, param);
+        printf("Client %d says: %s\n", sender_id, param);
+        
+        // Create a message that includes sender information
+        char full_message[BUFFER_SIZE];
+        snprintf(full_message, BUFFER_SIZE, "Client %d: %s", sender_id, param);
+        
         pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (server_communications[i]) {
-                server_communications[i]->comY(server_communications[i], param);
+            // Send to everyone except the original sender
+            if (server_communications[i] && i != sender_id) {
+                server_communications[i]->comY(server_communications[i], full_message);
             }
         }
         pthread_mutex_unlock(&clients_mutex);
     } else if (strcmp(cmd, "CMD_Y") == 0) {
-        printf("Command Y received: %s\n", param);
+        printf("Command Y received from client %d: %s\n", sender_id, param);
     } else {
-        printf("Unknown command received: '%s'\n", cmd);
+        printf("Unknown command received from client %d: '%s'\n", sender_id, cmd);
     }
     fflush(stdout);
 }
@@ -107,6 +123,7 @@ void* client_handler(void* arg) {
     
     // Create communication object
     Communication* communication = Communication_create(connection, protocol);
+    communication->client_id = client_id;
     communication->setMessageHandler(communication, message_handler);
     
     pthread_mutex_lock(&clients_mutex);
@@ -168,13 +185,114 @@ void signal_sigint_handler(int signal) {
     exit(EXIT_SUCCESS);
 }
 
+// Function to generate SSL keys dynamically
+int generate_server_keys(const char* cert_path, const char* key_path) {
+    printf("Generating new SSL keys...\n");
+    
+    // Generate a new RSA key pair
+    RSA *rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
+    if (!rsa) {
+        ERR_print_errors_fp(stderr);
+        return 0;
+    }
+    
+    // Create a new private key file
+    FILE *private_key_file = fopen(key_path, "wb");
+    if (!private_key_file) {
+        perror("Failed to open private key file");
+        RSA_free(rsa);
+        return 0;
+    }
+    
+    if (!PEM_write_RSAPrivateKey(private_key_file, rsa, NULL, NULL, 0, NULL, NULL)) {
+        ERR_print_errors_fp(stderr);
+        fclose(private_key_file);
+        RSA_free(rsa);
+        return 0;
+    }
+    fclose(private_key_file);
+    
+    // Now generate a self-signed certificate
+    X509 *x509 = X509_new();
+    if (!x509) {
+        ERR_print_errors_fp(stderr);
+        RSA_free(rsa);
+        return 0;
+    }
+    
+    // Set version
+    X509_set_version(x509, 2); // X509v3
+    
+    // Set serial number
+    ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
+    
+    // Set validity period
+    X509_gmtime_adj(X509_get_notBefore(x509), 0); // Valid from now
+    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // Valid for one year
+    
+    // Set public key
+    EVP_PKEY *pkey = EVP_PKEY_new();
+    EVP_PKEY_assign_RSA(pkey, rsa);
+    X509_set_pubkey(x509, pkey);
+    
+    // Set subject and issuer
+    X509_NAME *name = X509_get_subject_name(x509);
+    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (unsigned char *)"US", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (unsigned char *)"MyApp Server", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char *)"localhost", -1, -1, 0);
+    X509_set_issuer_name(x509, name);
+    
+    // Sign the certificate with our private key
+    if (!X509_sign(x509, pkey, EVP_sha256())) {
+        ERR_print_errors_fp(stderr);
+        X509_free(x509);
+        EVP_PKEY_free(pkey);
+        return 0;
+    }
+    
+    // Write the certificate to file
+    FILE *cert_file = fopen(cert_path, "wb");
+    if (!cert_file) {
+        perror("Failed to open certificate file");
+        X509_free(x509);
+        EVP_PKEY_free(pkey);
+        return 0;
+    }
+    
+    if (!PEM_write_X509(cert_file, x509)) {
+        ERR_print_errors_fp(stderr);
+        fclose(cert_file);
+        X509_free(x509);
+        EVP_PKEY_free(pkey);
+        return 0;
+    }
+    
+    fclose(cert_file);
+    X509_free(x509);
+    EVP_PKEY_free(pkey);
+    
+    printf("New SSL keys generated successfully\n");
+    return 1;
+}
+
 int main() {
     load_env_file(".ini");
     // Load environment variables
     const char *cert_path = get_env_value("CERT_PATH");
     const char *key_path = get_env_value("KEY_PATH");
-    if (!cert_path && !key_path) {
-        fprintf(stderr, "Missing CERT_PATH and KEY_PATH environment variables.\n");
+    if (!cert_path || !key_path) {
+        fprintf(stderr, "Missing CERT_PATH or KEY_PATH environment variables.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize OpenSSL
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+    
+    // Generate new keys each time server starts
+    if (!generate_server_keys(cert_path, key_path)) {
+        fprintf(stderr, "Failed to generate server keys\n");
         exit(EXIT_FAILURE);
     }
 
@@ -194,10 +312,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    // Initialize OpenSSL and set up TLS context
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_all_algorithms();
+    // Set up TLS context with the newly generated keys
     const SSL_METHOD *method = TLS_server_method();
     ssl_ctx = SSL_CTX_new(method);
     if (!ssl_ctx) {

@@ -35,12 +35,12 @@ public class MainActivity extends AppCompatActivity {
         client = new Client(this);
         client.setMessageListener(new Client.MessageListener() {
             @Override
-            public void onMessageReceived(final String message) {
+            public void onMessageReceived(final String message, final String senderId) {
                 // Update UI on main thread
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        appendMessage("Server: " + message);
+                        appendMessage("Client " + senderId + ": " + message);
                     }
                 });
             }

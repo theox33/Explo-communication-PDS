@@ -1,129 +1,59 @@
-package com.example.server_client;
-import android.util.Log;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
-public class Communication {
-    private static final String TAG = "Communication";
-    private static final int BUFFER_SIZE = 1024;
+// protocol.c
+#include "protocol.h"
 
-    public interface MessageHandler {
-        void onMessageReceived(String cmd, String param);
+static void Protocol_encodeMessage(Protocol* protocol, const char* cmd, const char* param, char* out_buffer) {
+    // Format : "CMD|PARAM\0"
+    int offset = 0;
+    
+    // Copier la commande
+    while (*cmd) {
+        out_buffer[offset++] = *cmd++;
     }
-
-    private Connection connection;
-    private Protocol protocol;
-    private MessageHandler messageHandler;
-    private Thread communicationThread;
-    private AtomicBoolean running = new AtomicBoolean(false);
-
-    public Communication(Connection connection, Protocol protocol) {
-        this.connection = connection;
-        this.protocol = protocol;
+    
+    // Ajouter le séparateur
+    out_buffer[offset++] = '|';
+    
+    // Copier le paramètre
+    while (*param) {
+        out_buffer[offset++] = *param++;
     }
+    
+    // S'assurer de la terminaison nulle
+    out_buffer[offset] = '\0';
+    
+    printf("Message encodé : '%s'\n", out_buffer);
+}
 
-    public void setMessageHandler(MessageHandler handler) {
-        this.messageHandler = handler;
+static void Protocol_decodeMessage(Protocol* protocol, const char* message, char* cmd, char* param) {
+    // Analyser le format "CMD|PARAM"
+    char* delimiter = strchr(message, '|');
+    if (delimiter) {
+        int cmd_length = delimiter - message;
+        strncpy(cmd, message, cmd_length);
+        cmd[cmd_length] = '\0';
+        
+        strcpy(param, delimiter + 1);
+    } else {
+        strcpy(cmd, message);
+        param[0] = '\0';
     }
+}
 
-    public void comX(String param) {
-        byte[] message = protocol.encodeMessage(Protocol.CMD_X, param);
-        connection.write(message, message.length);
+Protocol* Protocol_create() {
+    Protocol* protocol = (Protocol*)malloc(sizeof(Protocol));
+    if (protocol) {
+        protocol->cmdX = "CMD_X";
+        protocol->cmdY = "CMD_Y";
+        
+        // Assigner les pointeurs de méthode
+        protocol->encodeMessage = Protocol_encodeMessage;
+        protocol->decodeMessage = Protocol_decodeMessage;
     }
+    return protocol;
+}
 
-    public void comY(String param) {
-        byte[] message = protocol.encodeMessage(Protocol.CMD_Y, param);
-        connection.write(message, message.length);
-    }
-
-    public void run() {
-        if (running.get()) {
-            return; // Already running
-        }
-
-        running.set(true);
-
-        communicationThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Log.d(TAG, "Communication thread started");
-                byte[] buffer = new byte[BUFFER_SIZE];
-                int consecutiveEmptyReads = 0;
-                final int maxConsecutiveEmptyReads = 5;
-
-                while (running.get() && connection.isConnected()) {
-                    Arrays.fill(buffer, (byte)0); // Clear buffer
-
-                    int bytesRead = connection.read(buffer, BUFFER_SIZE - 1);
-
-                    if (bytesRead > 0) {
-                        consecutiveEmptyReads = 0;
-
-                        // Ensure null termination and convert to string
-                        String rawMessage = new String(buffer, 0, bytesRead);
-                        Log.d(TAG, "Raw data received: '" + rawMessage + "'");
-
-                        // Process the message
-                        String[] parts = protocol.decodeMessage(rawMessage);
-
-                        // Call the message handler if set
-                        if (messageHandler != null) {
-                            messageHandler.onMessageReceived(parts[0], parts[1]);
-                        }
-                    } else if (bytesRead == 0) {
-                        // No data available
-                        consecutiveEmptyReads++;
-
-                        // If connection lost
-                        if (!connection.isConnected()) {
-                            Log.d(TAG, "Connection closed by peer (normal)");
-                            break;
-                        }
-
-                        // Connection check after multiple empty reads
-                        if (consecutiveEmptyReads > maxConsecutiveEmptyReads) {
-                            Log.d(TAG, "Multiple empty reads, checking connection");
-                            if (!connection.isConnected()) {
-                                Log.d(TAG, "Connection appears broken");
-                                break;
-                            }
-                            consecutiveEmptyReads = 0;
-                        }
-                    } else {
-                        // Error occurred
-                        Log.e(TAG, "Read error, terminating communication thread");
-                        break;
-                    }
-
-                    // Small delay to prevent CPU hogging
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        break;
-                    }
-                }
-
-                Log.d(TAG, "Communication thread exiting");
-                running.set(false);
-            }
-        });
-
-        communicationThread.start();
-    }
-
-    public void stop() {
-        running.set(false);
-        if (communicationThread != null) {
-            communicationThread.interrupt();
-            try {
-                communicationThread.join(1000); // Wait up to 1 second for thread to finish
-            } catch (InterruptedException e) {
-                Log.w(TAG, "Interrupted while waiting for thread to join");
-            }
-            communicationThread = null;
-        }
-    }
-
-    public boolean isRunning() {
-        return running.get();
+void Protocol_destroy(Protocol* protocol) {
+    if (protocol) {
+        free(protocol);
     }
 }

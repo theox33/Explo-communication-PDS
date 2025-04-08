@@ -2,30 +2,30 @@
 #include "protocol.h"
 
 static void Protocol_encodeMessage(Protocol* protocol, const char* cmd, const char* param, char* out_buffer) {
-    // Format: "CMD|PARAM\0"
+    // Format : "CMD|PARAM\0"
     int offset = 0;
     
-    // Copy command
+    // Copier la commande
     while (*cmd) {
         out_buffer[offset++] = *cmd++;
     }
     
-    // Add separator
+    // Ajouter le séparateur
     out_buffer[offset++] = '|';
     
-    // Copy parameter
+    // Copier le paramètre
     while (*param) {
         out_buffer[offset++] = *param++;
     }
     
-    // Ensure null termination
+    // S'assurer de la terminaison nulle
     out_buffer[offset] = '\0';
     
-    printf("Encoded message: '%s'\n", out_buffer);
+    printf("Message encodé : '%s'\n", out_buffer);
 }
 
 static void Protocol_decodeMessage(Protocol* protocol, const char* message, char* cmd, char* param) {
-    // Parse "CMD|PARAM" format
+    // Analyser le format "CMD|PARAM"
     char* delimiter = strchr(message, '|');
     if (delimiter) {
         int cmd_length = delimiter - message;
@@ -45,7 +45,7 @@ Protocol* Protocol_create() {
         protocol->cmdX = "CMD_X";
         protocol->cmdY = "CMD_Y";
         
-        // Assign method pointers
+        // Assigner les pointeurs de méthode
         protocol->encodeMessage = Protocol_encodeMessage;
         protocol->decodeMessage = Protocol_decodeMessage;
     }

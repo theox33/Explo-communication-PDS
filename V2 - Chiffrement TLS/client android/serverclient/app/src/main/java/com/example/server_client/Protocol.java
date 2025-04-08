@@ -8,7 +8,7 @@ public class Protocol {
     public byte[] encodeMessage(String cmd, String param) {
         String message = cmd + "|" + param;
         Log.d(TAG, "Encoded message: " + message);
-        return (message + "\0").getBytes(); // Add null terminator like C code
+        return (message + "\0").getBytes();
     }
 
     public String[] decodeMessage(String message) {
@@ -16,8 +16,8 @@ public class Protocol {
         int separatorIndex = message.indexOf('|');
 
         if (separatorIndex != -1) {
-            parts[0] = message.substring(0, separatorIndex); // Command
-            parts[1] = message.substring(separatorIndex + 1); // Parameter
+            parts[0] = message.substring(0, separatorIndex); 
+            parts[1] = message.substring(separatorIndex + 1);
         } else {
             parts[0] = message;
         }

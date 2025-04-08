@@ -13,10 +13,12 @@ public class Client {
     private boolean initialized = false;
 
     public interface MessageListener {
-        void onMessageReceived(String message);
+        void onMessageReceived(String message, String senderId);
     }
 
     private MessageListener messageListener;
+
+    private int clientId = -1;
 
     // Update constructor to accept a Context parameter
     public Client(Context context) {
@@ -28,8 +30,33 @@ public class Client {
             @Override
             public void onMessageReceived(String cmd, String param) {
                 Log.d(TAG, "Received from server: " + param);
-                if (messageListener != null) {
-                    messageListener.onMessageReceived(param);
+
+                if (cmd.equals(Protocol.CMD_Y)) {
+                    // Extract sender info from message format "Client X: message"
+                    int colonPos = param.indexOf(": ");
+                    if (colonPos > 0) {
+                        String senderInfo = param.substring(0, colonPos);
+                        String actualMessage = param.substring(colonPos + 2);
+
+                        // If sender info is in format "Client X"
+                        if (senderInfo.startsWith("Client ")) {
+                            String senderId = senderInfo.substring(7); // Get the number part
+
+                            if (messageListener != null) {
+                                messageListener.onMessageReceived(actualMessage, senderId);
+                            }
+                        } else {
+                            // Default case if format doesn't match
+                            if (messageListener != null) {
+                                messageListener.onMessageReceived(param, "Server");
+                            }
+                        }
+                    } else {
+                        // Message doesn't contain sender info
+                        if (messageListener != null) {
+                            messageListener.onMessageReceived(param, "Server");
+                        }
+                    }
                 }
             }
         });
