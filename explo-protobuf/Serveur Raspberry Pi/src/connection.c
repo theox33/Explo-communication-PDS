@@ -7,6 +7,9 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 
+#include "./package/protocol/protobuf/src/protocol.h"
+#include "./package/protocol/protobuf/dist/src/message.pb-c.h"
+
 #define PORT 12345
 #define BUFFER_SIZE 1024
 
@@ -40,7 +43,14 @@ void gestion_client(int client_socket) {
             if (strcmp(buffer, "exit\n") == 0) {
                 running_client = 0;
             } else {
-                printf("Received from client %d: %s\n", id_client, buffer);
+                size_t msg_size = bytes_received;
+                char* plain = protocol_decrypt_message((uint8_t*)buffer, msg_size);
+                if (plain) {
+                    printf("Received from client %d: %s\n", id_client, plain);
+                    free(plain);
+                } else {
+                    fprintf(stderr, "Failed to decode protobuf message\n");
+                }
             }
         }
     }
