@@ -29,13 +29,13 @@ public class Connection extends AppCompatActivity {
     private Thread receiveThread;
     private boolean isConnected = false;
 
-    private final String SERVER_IP = "10.247.95.45";  // change if needed
+    private final String SERVER_IP = "10.247.95.45";
     private final int SERVER_PORT = 12345;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main); // Assure-toi que le XML s'appelle bien comme ça
+        setContentView(R.layout.activity_main);
 
         connectButton = findViewById(R.id.connect_button);
         sendButton = findViewById(R.id.send_button);
@@ -56,9 +56,9 @@ public class Connection extends AppCompatActivity {
         sendButton.setOnClickListener(v -> {
             String messageText = messageInput.getText().toString();
             if (!messageText.isEmpty()) {
-                sendMessage(messageText);
+                postMessage(messageText);
                 messageInput.setText("");
-                appendMessage("You: " + messageText);
+                appendMessage("Ares: " + messageText);
             }
         });
     }
@@ -73,7 +73,7 @@ public class Connection extends AppCompatActivity {
                 runOnUiThread(() -> {
                     connectButton.setText("Disconnect");
                     sendButton.setEnabled(true);
-                    appendMessage("[Connected to server]");
+                    appendMessage("[Connected to Hermes]");
                 });
 
                 receiveThread = new Thread(() -> {
@@ -90,7 +90,7 @@ public class Connection extends AppCompatActivity {
                             Message.AMessage msg = Message.AMessage.parseFrom(actualData);
                             String decrypted = xorTransform(msg.getContent());
 
-                            runOnUiThread(() -> appendMessage("Server: " + decrypted));
+                            runOnUiThread(() -> appendMessage("Hermes: " + decrypted));
                         }
                     } catch (Exception e) {
                         runOnUiThread(() -> appendMessage("[Reception error: " + e.getMessage() + "]"));
@@ -115,7 +115,7 @@ public class Connection extends AppCompatActivity {
             runOnUiThread(() -> {
                 connectButton.setText("Connect");
                 sendButton.setEnabled(false);
-                appendMessage("[Disconnected from server]");
+                appendMessage("[Disconnected from Hermes]");
             });
 
         } catch (Exception e) {
@@ -124,7 +124,7 @@ public class Connection extends AppCompatActivity {
         }
     }
 
-    private void sendMessage(String messageText) {
+    private void postMessage(String messageText) {
         new Thread(() -> {
             try {
                 Message.AMessage protoMessage = Message.AMessage.newBuilder()

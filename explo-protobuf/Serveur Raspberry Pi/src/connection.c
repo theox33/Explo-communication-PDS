@@ -13,7 +13,7 @@
 #include "./package/protocol/protobuf/dist/src/message.pb-c.h"
 
 #define PORT 12345
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 256
 
 int server_socket, client_socket;
 int running_server = 1;
@@ -30,7 +30,7 @@ void signal_sigint_handler(int signal) {
     exit(EXIT_SUCCESS);
 }
 
-void* thread_envoi_serveur(void* arg) {
+void* postMessage(void* arg) {
     send_thread_args* args = (send_thread_args*)arg;
     int socket = args->socket;
     int id_client = args->id_client;
@@ -39,7 +39,7 @@ void* thread_envoi_serveur(void* arg) {
     char input_buffer[BUFFER_SIZE];
 
     while (1) {
-        printf("Saisir un message à envoyer au client %d (ou 'exit') :\n> ", id_client);
+        printf("Saisir un message à envoyer a Ares %d (ou 'exit') :\n> ", id_client);
         fflush(stdout);
 
         if (!fgets(input_buffer, sizeof(input_buffer), stdin)) {
@@ -57,9 +57,9 @@ void* thread_envoi_serveur(void* arg) {
         ssize_t sent = write(socket, packet, packet_size);
 
         if (sent < 0) {
-            perror("Erreur envoi serveur -> client");
+            perror("Erreur envoi Hermes -> Ares");
         } else {
-            printf("Serveur → Client %d : message envoyé (%ld octets)\n", id_client, sent);
+            printf("Hermes → Ares %d : message envoyé (%ld octets)\n", id_client, sent);
         }
 
         free(packet);
@@ -69,7 +69,7 @@ void* thread_envoi_serveur(void* arg) {
 }
 
 
-void gestion_client(int client_socket) {
+void receiveMessage(int client_socket) {
     int running_client = 1;
     char buffer[BUFFER_SIZE];
     static int id_client = 0;
@@ -82,7 +82,7 @@ void gestion_client(int client_socket) {
     args->socket = client_socket;
     args->id_client = id_client;
 
-    if (pthread_create(&send_thread, NULL, thread_envoi_serveur, args) != 0) {
+    if (pthread_create(&send_thread, NULL, postMessage, args) != 0) {
         perror("Erreur création thread d'envoi");
     }
 
@@ -94,7 +94,7 @@ void gestion_client(int client_socket) {
             perror("Error reading from socket");
             break;
         } else if (bytes_received == 0) {
-            printf("Client %d disconnected\n", id_client);
+            printf("Ares %d disconnected\n", id_client);
             running_client = 0;
         } else {
             buffer[bytes_received] = '\0';  // Null-terminate the string
@@ -104,7 +104,7 @@ void gestion_client(int client_socket) {
                 size_t msg_size = bytes_received;
                 char* plain = protocol_decrypt_message((uint8_t*)buffer, msg_size);
                 if (plain) {
-                    printf("Received from client %d: %s\n", id_client, plain);
+                    printf("Received from Ares %d: %s\n", id_client, plain);
                     free(plain);
                 } else {
                     fprintf(stderr, "Failed to decode protobuf message\n");
@@ -113,7 +113,7 @@ void gestion_client(int client_socket) {
         }
     }
     
-    printf("Client %d session ended\n", id_client);
+    printf("Ares %d session ended\n", id_client);
     pthread_cancel(send_thread);
     pthread_join(send_thread, NULL);
 
@@ -154,7 +154,7 @@ int main() {
     }
     
     while (running_server) {
-        printf("Server waiting for connections on port %d...\n", PORT);
+        printf("Hermes waiting for connections on port %d...\n", PORT);
 
         // Accept a client connection
         client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_address_len);
@@ -167,7 +167,7 @@ int main() {
         printf("Connection accepted from %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
 
         // Process the connection with the client
-        gestion_client(client_socket);
+        receiveMessage(client_socket);
         
         // Close the client socket after handling the session
         close(client_socket);
