@@ -1,99 +1,162 @@
 package com.example.client_android;
 
-import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.client_android.Message;
+
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.OutputStream;
 import java.net.Socket;
 
 public class Connection extends AppCompatActivity {
 
-    private EditText editTextMessage;
-    private Button sendButton;
-    private TextView textViewStatus;
-    private Socket socket;
-    private PrintWriter out;
-    private BufferedReader in;
+    private Button connectButton, sendButton;
+    private EditText messageInput;
+    private TextView messagesDisplay;
+    private ScrollView scrollView;
 
-    // Update the IP address as needed.
-    // If testing on an emulator with the server running on your local PC, use "10.0.2.2".
-    private final String SERVER_IP = "192.168.242.45";
+    private Socket socket;
+    private OutputStream out;
+    private Thread receiveThread;
+    private boolean isConnected = false;
+
+    private final String SERVER_IP = "10.247.95.45";  // change if needed
     private final int SERVER_PORT = 12345;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main); // Assure-toi que le XML s'appelle bien comme ça
 
-        // Link the UI components defined in activity_main.xml
-        editTextMessage = findViewById(R.id.editTextMessage);
-        sendButton = findViewById(R.id.sendButton);
-        textViewStatus = findViewById(R.id.textViewStatus);
+        connectButton = findViewById(R.id.connect_button);
+        sendButton = findViewById(R.id.send_button);
+        messageInput = findViewById(R.id.message_input);
+        messagesDisplay = findViewById(R.id.messages_display);
+        scrollView = findViewById(R.id.scroll_view);
 
-        // Connect to the server on a background thread
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    socket = new Socket(SERVER_IP, SERVER_PORT);
-                    out = new PrintWriter(socket.getOutputStream(), true);
-                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        sendButton.setEnabled(false);
 
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            textViewStatus.setText("Connected to server " + SERVER_IP + ":" + SERVER_PORT);
-                        }
-                    });
-
-                    // Optionally, read messages from the server if needed.
-                    // This sample only sends messages.
-
-                } catch (final Exception e) {
-                    e.printStackTrace();
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            textViewStatus.setText("Connection error: " + e.getMessage());
-                        }
-                    });
-                }
-            }
-        }).start();
-
-        // Set up the send button to transmit messages to the server
-        sendButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                final String message = editTextMessage.getText().toString();
-                if (message.isEmpty()) return;
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (out != null) {
-                            out.println(message);
-                        }
-                    }
-                }).start();
+        connectButton.setOnClickListener(v -> {
+            if (!isConnected) {
+                connectToServer();
+            } else {
+                disconnectFromServer();
             }
         });
+
+        sendButton.setOnClickListener(v -> {
+            String messageText = messageInput.getText().toString();
+            if (!messageText.isEmpty()) {
+                sendMessage(messageText);
+                messageInput.setText("");
+                appendMessage("You: " + messageText);
+            }
+        });
+    }
+
+    private void connectToServer() {
+        new Thread(() -> {
+            try {
+                socket = new Socket(SERVER_IP, SERVER_PORT);
+                out = socket.getOutputStream();
+                isConnected = true;
+
+                runOnUiThread(() -> {
+                    connectButton.setText("Disconnect");
+                    sendButton.setEnabled(true);
+                    appendMessage("[Connected to server]");
+                });
+
+                receiveThread = new Thread(() -> {
+                    try {
+                        InputStream input = socket.getInputStream();
+                        byte[] buffer = new byte[1024];
+                        while (isConnected) {
+                            int bytesRead = input.read(buffer);
+                            if (bytesRead == -1) break;
+
+                            byte[] actualData = new byte[bytesRead];
+                            System.arraycopy(buffer, 0, actualData, 0, bytesRead);
+
+                            Message.AMessage msg = Message.AMessage.parseFrom(actualData);
+                            String decrypted = xorTransform(msg.getContent());
+
+                            runOnUiThread(() -> appendMessage("Server: " + decrypted));
+                        }
+                    } catch (Exception e) {
+                        runOnUiThread(() -> appendMessage("[Reception error: " + e.getMessage() + "]"));
+                        e.printStackTrace();
+                    }
+                });
+                receiveThread.start();
+
+            } catch (Exception e) {
+                runOnUiThread(() -> appendMessage("[Connection failed: " + e.getMessage() + "]"));
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private void disconnectFromServer() {
+        try {
+            isConnected = false;
+            if (socket != null) socket.close();
+            if (receiveThread != null && receiveThread.isAlive()) receiveThread.interrupt();
+
+            runOnUiThread(() -> {
+                connectButton.setText("Connect");
+                sendButton.setEnabled(false);
+                appendMessage("[Disconnected from server]");
+            });
+
+        } catch (Exception e) {
+            runOnUiThread(() -> appendMessage("[Disconnection error: " + e.getMessage() + "]"));
+            e.printStackTrace();
+        }
+    }
+
+    private void sendMessage(String messageText) {
+        new Thread(() -> {
+            try {
+                Message.AMessage protoMessage = Message.AMessage.newBuilder()
+                        .setContent(xorTransform(messageText))
+                        .build();
+
+                byte[] data = protoMessage.toByteArray();
+                out.write(data);
+                out.flush();
+            } catch (Exception e) {
+                runOnUiThread(() -> appendMessage("[Send error: " + e.getMessage() + "]"));
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private void appendMessage(String message) {
+        messagesDisplay.append(message + "\n");
+        scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private String xorTransform(String input) {
+        char[] chars = input.toCharArray();
+        for (int i = 0; i < chars.length; i++) {
+            chars[i] ^= 0x5A;
+        }
+        return new String(chars);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Clean up the socket when the activity is destroyed
-        try {
-            if (socket != null) {
-                socket.close();
-            }
-        } catch (Exception e) {
-            // Exception handling as needed
-        }
+        disconnectFromServer();
     }
 }

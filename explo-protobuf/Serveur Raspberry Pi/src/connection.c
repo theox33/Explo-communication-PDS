@@ -6,6 +6,8 @@
 #include <signal.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
+#include <termios.h>
+
 
 #include "./package/protocol/protobuf/src/protocol.h"
 #include "./package/protocol/protobuf/dist/src/message.pb-c.h"
@@ -16,11 +18,56 @@
 int server_socket, client_socket;
 int running_server = 1;
 
+typedef struct {
+    int socket;
+    int id_client;
+} send_thread_args;
+
+
 void signal_sigint_handler(int signal) {
     fprintf(stdout, "\nSIGINT intercepted (PID %d)\n", getpid());
     close(client_socket);
     exit(EXIT_SUCCESS);
 }
+
+void* thread_envoi_serveur(void* arg) {
+    send_thread_args* args = (send_thread_args*)arg;
+    int socket = args->socket;
+    int id_client = args->id_client;
+    free(arg);
+
+    char input_buffer[BUFFER_SIZE];
+
+    while (1) {
+        printf("Saisir un message à envoyer au client %d (ou 'exit') :\n> ", id_client);
+        fflush(stdout);
+
+        if (!fgets(input_buffer, sizeof(input_buffer), stdin)) {
+            break;
+        }
+
+        input_buffer[strcspn(input_buffer, "\n")] = '\0';
+
+        if (strcmp(input_buffer, "exit") == 0) {
+            break;
+        }
+
+        size_t packet_size;
+        uint8_t* packet = protocol_encrypt_message(input_buffer, &packet_size);
+        ssize_t sent = write(socket, packet, packet_size);
+
+        if (sent < 0) {
+            perror("Erreur envoi serveur -> client");
+        } else {
+            printf("Serveur → Client %d : message envoyé (%ld octets)\n", id_client, sent);
+        }
+
+        free(packet);
+    }
+
+    pthread_exit(NULL);
+}
+
 
 void gestion_client(int client_socket) {
     int running_client = 1;
@@ -28,6 +75,17 @@ void gestion_client(int client_socket) {
     static int id_client = 0;
 
     id_client++;
+
+    // Créer une thread pour l'envoi serveur -> client
+    pthread_t send_thread;
+    send_thread_args* args = malloc(sizeof(send_thread_args));
+    args->socket = client_socket;
+    args->id_client = id_client;
+
+    if (pthread_create(&send_thread, NULL, thread_envoi_serveur, args) != 0) {
+        perror("Erreur création thread d'envoi");
+    }
+
 
     while (running_client) {
         ssize_t bytes_received;
@@ -56,6 +114,9 @@ void gestion_client(int client_socket) {
     }
     
     printf("Client %d session ended\n", id_client);
+    pthread_cancel(send_thread);
+    pthread_join(send_thread, NULL);
+
 }
 
 int main() {
