@@ -1,0 +1,146 @@
+@startuml Diagramme_Classe_Communication
+' Définition du style
+Left to right direction
+
+' == Client_1 ==
+package Client_1 {
+    
+    class Scribe {
+        - proxy : Proxy_Mailman_2
+        + sendMessage(msg: Message) : bool
+        + onReceive(cb: Message → void) : void
+    }
+
+    package Proxy_Client_2 {
+        class Proxy_Mailman_2 {
+            - remoteHost: String
+            - port: int
+            - conn: Connection_1
+            - proto: Protocol_1
+            - comm: Communication_1
+            + init(host: String, port: int) : void
+            + PostMessage(msg: Message) : bool
+        }
+
+        package Comm_backbone {
+            class Connection_1 {
+                - sockFd: int
+                - tlsCtx: TLSContext
+                + connect() : bool
+                + disconnect() : void
+                + send(raw: byte[]) : int
+                + receive() : byte[]
+            }
+            class Protocol_1 {
+                - schema: ProtoSchema
+                + marshal(msg: Message) : byte[]
+                + unmarshal(raw: byte[]) : Message
+            }
+            class Communication_1 {
+                - conn: Connection_1
+                - proto: Protocol_1
+                - dispatcher: dispatch_1
+                + send(msg: Message) : bool
+                + onReceive(cb: Message → void) : void
+            }
+            class dispatch_1 {
+                - handlers: Map<MessageType, Message→void>
+                + registerHandler(type: MessageType, h: Message→void) : void
+                + dispatch(raw: byte[]) : void
+            }
+            class Postman_1 {
+                + enqueue(raw: byte[]) : void
+            }
+        }
+    }
+}
+
+' == Client_2 ==
+package Client_2 {
+    class Mailman_2 {
+        - proxy: Proxy_Mailman_1
+        + PostMessage(msg: Message) : bool
+        + onReceive(cb: Message → void) : void
+    }
+
+    package Proxy_Client_1 {
+        class Proxy_Mailman_1 {
+            - remoteHost: String
+            - port: int
+            - conn: Connection_2
+            - proto: Protocol_2
+            - comm: Communication_2
+            + init(host: String, port: int) : void
+            + PostMessage(msg: Message) : bool
+        }
+
+        package Comm_backbone {
+            class Connection_2 {
+                - sockFd: int
+                - tlsCtx: TLSContext
+                + connect() : bool
+                + disconnect() : void
+                + send(raw: byte[]) : int
+                + receive() : byte[]
+            }
+            class Protocol_2 {
+                - schema: ProtoSchema
+                + marshal(msg: Message) : byte[]
+                + unmarshal(raw: byte[]) : Message
+            }
+            class Communication_2 {
+                - conn: Connection_2
+                - proto: Protocol_2
+                - dispatcher: dispatch_2
+                + send(msg: Message) : bool
+                + onReceive(cb: Message → void) : void
+            }
+            class dispatch_2 {
+                - handlers: Map<MessageType, Message→void>
+                + registerHandler(type: MessageType, h: Message→void) : void
+                + dispatch(raw: byte[]) : void
+            }
+            class Postman_2 {
+                + enqueue(raw: byte[]) : void
+            }
+        }
+    }
+}
+
+' == Types ==
+class Message {
+    - type: MessageType
+    - payload: byte[]
+    + getType(): MessageType
+    + getPayload(): byte[]
+}
+
+enum MessageType {
+    REQUEST
+    RESPONSE
+    HEARTBEAT
+}
+
+' == Relations ==
+Scribe --> Proxy_Mailman_2 : uses
+Scribe --> Mailman_2 : direct call
+
+Proxy_Mailman_2 --> Postman_1
+Postman_1 --> Communication_1
+Communication_1 --> Protocol_1
+Protocol_1 --> Communication_1
+Communication_1 --> Connection_1
+Connection_1 --> Communication_1
+Communication_1 --> dispatch_1
+dispatch_1 --> Scribe
+
+Connection_1 -- Connection_2 : TCP/TLS
+
+Connection_2 --> Communication_2
+Communication_2 --> Protocol_2
+Protocol_2 --> Communication_2
+Communication_2 --> dispatch_2
+dispatch_2 --> Mailman_2
+Mailman_2 --> Postman_2
+Postman_2 --> Communication_2
+@enduml
