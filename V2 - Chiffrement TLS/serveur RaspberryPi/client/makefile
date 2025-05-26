@@ -19,7 +19,7 @@ MKDIR_P = mkdir -p
 CCFLAGS = -Wall -MMD -MP
 CCFLAGS += -lrt
 CCFLAGS += -O0
-LDFLAGS = -lm
+LDFLAGS = -lm -lssl -lcrypto
 
 # Error handling 
 CCFLAGS += -Werror=uninitialized

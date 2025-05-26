@@ -3,6 +3,7 @@
         "protocol.h": "c",
         "communication.h": "c",
         "proxy_server.C": "cpp",
-        "proxy_server.h": "c"
+        "proxy_server.h": "c",
+        "connection.h": "c"
     }
 }
