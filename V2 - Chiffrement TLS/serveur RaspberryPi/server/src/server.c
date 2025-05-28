@@ -1,4 +1,15 @@
-// server.c
+/**
+ * @file server.c
+ * @author Théo AVRIL
+ * @brief Serveur principal TLS pour communication sécurisée avec les clients.
+ * @date 2025-05-26
+ * @license MIT
+ *
+ * Ce fichier implémente un serveur TCP sécurisé par TLS/SSL, capable de gérer plusieurs clients
+ * en parallèle grâce à des threads. Il utilise OpenSSL pour la gestion des connexions sécurisées
+ * et propose une interface de communication basée sur des protocoles personnalisés.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +19,8 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
-
-
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -25,24 +33,29 @@
 #define PORT 5001
 #define MAX_CLIENTS 2
 
+/**
+ * @struct ClientInfo
+ * @brief Structure contenant les informations d'un client connecté.
+ */
 typedef struct {
-    int client_socket;
-    struct sockaddr_in client_addr;
-    int id;
+    int client_socket;  /**< Descripteur de socket du client */
+    struct sockaddr_in client_addr; /**< Adresse du client */
+    int id; /**< Identifiant du client */
 } ClientInfo;
 
-/* brief Structure pour mapper les clients aux communications.
- * Utilisée pour stocker l'identifiant du client et la communication associée.
+/**
+ * @struct ClientMapping
+ * @brief Structure pour mapper un identifiant de client à sa communication.
  */
-
 typedef struct {
-    int id;
-    Communication* comm;
+    int id; /**< Identifiant du client */
+    Communication* comm;    /**< Pointeur vers la communication du client */
 } ClientMapping;
 
-// Global TLS context pointer
+// Pointeur vers le contexte SSL
 SSL_CTX* ssl_ctx = NULL;
 
+// Tableaux pour stocker les connexions et communications des clients
 Connection* server_connections[MAX_CLIENTS] = {NULL};
 Communication* server_communications[MAX_CLIENTS] = {NULL};
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -179,6 +192,7 @@ void signal_sigint_handler(int signal) {
         close(server_socket);
     }
     
+    // Arrêt de tous les clients connectés
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (server_communications[i]) {
@@ -202,7 +216,7 @@ void signal_sigint_handler(int signal) {
 }
 
 /**
- * @brief Génère de nouvelles clés SSL pour le serveur.
+ * @brief Génère de nouvelles clés SSL pour le serveur si elles n'existent pas.
  * @param[in] cert_path Chemin du fichier de certificat à créer.
  * @param[in] key_path Chemin du fichier de clé privée à créer.
  * @return 1 si la génération a réussi, 0 sinon.
@@ -226,6 +240,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
+    // Écriture de la clé privée dans le fichier
     if (!PEM_write_RSAPrivateKey(private_key_file, rsa, NULL, NULL, 0, NULL, NULL)) {
         ERR_print_errors_fp(stderr);
         fclose(private_key_file);
@@ -249,8 +264,8 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
     ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
     
     // Sélection de la période de validité du certificat
-    X509_gmtime_adj(X509_get_notBefore(x509), 0); // Valid depuis maintenant
-    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // Valid pour 1 an
+    X509_gmtime_adj(X509_get_notBefore(x509), 0); // Valide depuis maintenant
+    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // Valide pour 1 an
     
     // Ajout de la clé publique au certificat
     EVP_PKEY *pkey = EVP_PKEY_new();
@@ -272,7 +287,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
-    // Écriture du certificat dans un fichier
+    // Création du fichier de certificat
     FILE *cert_file = fopen(cert_path, "wb");
     if (!cert_file) {
         perror("Failed to open certificate file");
@@ -281,6 +296,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
+    // Écriture du certificat dans le fichier
     if (!PEM_write_X509(cert_file, x509)) {
         ERR_print_errors_fp(stderr);
         fclose(cert_file);
@@ -345,6 +361,8 @@ int main() {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
+
+    // Chargement du certificat et de la clé privée
     if (SSL_CTX_use_certificate_file(ssl_ctx, cert_path, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
@@ -354,17 +372,20 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
+    // Configuration de l'adresse du serveur
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = INADDR_ANY;
     server_address.sin_port = htons(PORT);
     
+    // Liaison du socket à l'adresse et au port
     if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
         perror("Bind failed");
         close(server_socket);
         exit(EXIT_FAILURE);
     }
     
+    // Mise en écoute du socket
     if (listen(server_socket, 5) == -1) {
         perror("Listen failed");
         close(server_socket);
@@ -374,6 +395,7 @@ int main() {
     printf("Server started on port %d\nWaiting for client connections...\n", PORT);
     fflush(stdout);
     
+    // Boucle principale pour accepter les connexions des clients
     while (running_server) {
         ClientInfo* client_info = malloc(sizeof(ClientInfo));
         if (!client_info) {
@@ -381,6 +403,7 @@ int main() {
             continue;
         }
         
+        // Acceptation d'une nouvelle connexion client
         socklen_t client_addr_len = sizeof(client_info->client_addr);
         client_info->client_socket = accept(server_socket, (struct sockaddr*)&client_info->client_addr, &client_addr_len);
         if (client_info->client_socket == -1) {
@@ -396,6 +419,7 @@ int main() {
             continue;
         }
         
+        // Vérification de la limite de clients
         pthread_mutex_lock(&clients_mutex);
         int slot = -1;
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -405,6 +429,7 @@ int main() {
             }
         }
         
+        // Si le serveur est plein, on refuse la connexion
         if (slot == -1) {
             pthread_mutex_unlock(&clients_mutex);
             printf("Server full, rejecting connection\n");
@@ -413,9 +438,11 @@ int main() {
             continue;
         }
         
+        // Enregistrement de l'identifiant du client
         client_info->id = slot;
         pthread_mutex_unlock(&clients_mutex);
         
+        // Création du thread pour gérer le client
         pthread_t client_thread;
         if (pthread_create(&client_thread, NULL, client_handler, client_info) != 0) {
             perror("Thread creation failed");

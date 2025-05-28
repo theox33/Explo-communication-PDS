@@ -1,6 +1,6 @@
 /**
  * @file client.c
- * @author Your Name
+ * @author Théo AVRIL
  * @brief Client TLS principal pour communication sécurisée avec le serveur.
  * @date 2025-05-26
  * @license MIT
@@ -14,10 +14,11 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/time.h>  // Pour struct timeval
-#include <sys/select.h>  // Pour fd_set
+#include <sys/time.h> 
+#include <sys/select.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+
 #include "../../common/communication.h"
 #include "../../common/connection.h"
 #include "../../common/protocol.h"
@@ -76,7 +77,7 @@ int main() {
     char buffer[BUFFER_SIZE];
     signal(SIGINT, signal_handler);
 
-    // Initialize OpenSSL
+    // Initialisation de la bibliothèque OpenSSL
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();

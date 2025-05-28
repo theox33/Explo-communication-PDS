@@ -1,6 +1,7 @@
 /**
  * @file communication.h
- * @brief Gestion de la couche de communication English/TLS.
+ * @author Théo AVRIL
+ * @brief Gestion de la communication TLS sécurisée (traitement des types de messages X et Y).
  * @date 2025-05-26
  * @license MIT
  */
@@ -36,8 +37,8 @@ typedef struct Communication {
     
     // Méthodes de communication
     void (*com)(struct Communication*, const char*); /**< Envoi de message */
-    void (*comX)(struct Communication*, const char*); /**< Envoi de message avec traitement spécifique */
-    void (*comY)(struct Communication*, const char*); /**< Envoi de message avec traitement spécifique */
+    void (*comX)(struct Communication*, const char*); /**< Envoi de message de type X avec traitement spécifique */
+    void (*comY)(struct Communication*, const char*); /**< Envoi de message de type Y avec traitement spécifique */
     void (*run)(struct Communication*); /**< Démarre le thread de communication */
     void (*stop)(struct Communication*); /**< Arrête le thread de communication */
     void (*setMessageHandler)(struct Communication* comm, MessageHandler handler); /**< Définit le gestionnaire de messages */

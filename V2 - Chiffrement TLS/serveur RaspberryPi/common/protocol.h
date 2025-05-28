@@ -1,5 +1,6 @@
 /**
  * @file protocol.h
+ * @author Théo AVRIL
  * @brief Encodage/décodage des messages pour le projet TLS.
  * @date 2025-05-26
  * @license MIT
