@@ -1,0 +1,41 @@
+/**
+ * @mainpage V2 - Chiffrement TLS - serveur RaspberryPi
+ *
+ * @section intro_sec Présentation du projet
+ *
+ * Ce sous-projet fait partie du projet global "V2 - Chiffrement TLS", dont l'objectif est de démontrer la possibilité d'établir une connexion sécurisée SSL/TLS sur une connexion TCP entre un serveur écrit en C et un client Android.
+ *
+ * Le présent sous-projet, intitulé "V2 - Chiffrement TLS - serveur RaspberryPi", correspond à l'implémentation de la partie serveur en C. Il met en œuvre un serveur TCP sécurisé par TLS/SSL (OpenSSL), capable de gérer plusieurs clients en parallèle grâce à des threads, et propose une interface de communication basée sur des protocoles personnalisés.
+ *
+ * @section test_c_sec Test avec un client C
+ *
+ * Pour tester et valider le fonctionnement SSL/TLS de manière approfondie, un dossier/fichier "client" est inclus dans ce dépôt. Ce client C permet de démontrer la capacité à échanger des messages sécurisés entre un serveur en C et un client en C, en utilisant la même infrastructure TLS.
+ *
+ * @section compat_android_sec Compatibilité avec Android
+ *
+ * Bien que ce sous-projet se concentre sur la partie serveur en C, il est important de noter que le serveur ainsi développé est également compatible avec un client Android (développé dans un autre sous-projet). Cela permet de valider l'interopérabilité entre différentes plateformes autour du protocole TLS.
+ *
+ * @section structure_sec Structure du code
+ *
+ * Le code est organisé autour de plusieurs modules :
+ * - @ref connection.h : gestion des connexions réseau sécurisées via OpenSSL.
+ * - @ref protocol.h : encodage/décodage des messages échangés.
+ * - @ref communication.h : gestion de la logique de communication et du threading.
+ * - server.c : point d'entrée du serveur, gestion des clients et du cycle de vie des connexions.
+ * - client.c : client C de test pour valider les échanges TLS.
+ *
+ * @section usage_sec Utilisation
+ * @subsection usage_steps Étapes d'utilisation serveur/client C
+ * 1. Lancer le serveur sur le Raspberry Pi ou toute machine compatible.
+ * 2. Aller à la racine de ce sous-projet : /V2 - Chiffrement TLS/serveur RaspberryPi/
+ * 3. Utiliser le Makefile générique pour compiler le serveur et le client C : ex.: `make all`
+ * 4. Ouvrir deux terminaux et entrer : `make run-server` puis `make run-client`.
+ * @subsection usage_android Étapes d'utilisation serveur C / client Android
+ * - Il est également possible de connecter un client Android (voir le sous-projet correspondant) pour valider la compatibilité inter-plateformes.
+ * - Effectuer les étapes précédentes à la différence que :
+    *   - 3. Utiliser le Makefile générique pour compiler le serveur : `make server`
+    *   - 4. Ouvrir un terminal et entrer : `make run-server`
+ * @section license_sec Licence
+ *
+ * Ce projet est distribué sous licence MIT.
+ */

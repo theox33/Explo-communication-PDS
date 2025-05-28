@@ -333,9 +333,13 @@ int main() {
     OpenSSL_add_all_algorithms();
     
     // Génération des clés SSL si elles n'existent pas
-    if (!generate_server_keys(cert_path, key_path)) {
-        fprintf(stderr, "Failed to generate server keys\n");
-        exit(EXIT_FAILURE);
+    if (access(cert_path, F_OK) == -1) {
+        if (!generate_server_keys(cert_path, key_path)) {
+            fprintf(stderr, "Failed to generate SSL keys.\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        printf("SSL keys already exist, using existing files.\n");
     }
 
     signal(SIGINT, signal_sigint_handler);

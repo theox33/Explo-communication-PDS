@@ -1,4 +1,4 @@
-.PHONY: all client server clean distclean run-client run-server test-client test-server debug-client debug-server
+.PHONY: all client server clean distclean run-client run-server docs
 
 all: client server
 
@@ -21,3 +21,12 @@ run-client:
 
 run-server:
 	$(MAKE) -C server run
+
+docs:
+	doxygen Doxyfile
+
+docs-clean:
+	rm -rf docs/html docs/latex
+
+copy-key:
+	cp server/ssl/server.crt "../client android/serverclient/app/src/main/assets"

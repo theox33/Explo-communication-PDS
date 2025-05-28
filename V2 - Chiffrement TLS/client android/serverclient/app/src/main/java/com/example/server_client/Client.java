@@ -4,7 +4,7 @@ import android.util.Log;
 
 public class Client {
     private static final String TAG = "Client";
-    private static final String SERVER_IP = "192.168.1.2"; // Update to your server IP
+    private static final String SERVER_IP = "10.209.27.229"; // Update to your server IP
     private static final int PORT = 5001;
 
     private Connection connection;

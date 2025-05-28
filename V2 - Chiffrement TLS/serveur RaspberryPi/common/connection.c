@@ -17,9 +17,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
-// Le thread peut gérer des tâches en arrière-plan comme le heartbeat
 static void* connection_thread_function(void* arg) {
-    Connection* conn = (Connection*)arg;
     return NULL;
 }
 
