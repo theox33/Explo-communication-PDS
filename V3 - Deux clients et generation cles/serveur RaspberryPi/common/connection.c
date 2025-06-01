@@ -1,3 +1,12 @@
+/**
+ * @file connection.c
+ * @brief Implementation of network connection management with SSL/TLS support
+ * @version 3.0
+ * @author Alexis DEVERCHERE
+ * @date 2025
+ */
+
+// TCP keepalive constants for cross-platform compatibility
 #ifndef TCP_KEEPIDLE
 #define TCP_KEEPIDLE 4
 #endif
@@ -17,12 +26,37 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
+/**
+ * @brief Background thread function for connection management
+ * 
+ * This function runs in a separate thread and can handle background tasks
+ * such as heartbeat monitoring, connection health checks, etc.
+ * 
+ * @param arg Pointer to the Connection object (cast from void*)
+ * @return void* Always returns NULL
+ * 
+ * @note Currently this is a placeholder for future background functionality
+ */
 static void* connection_thread_function(void* arg) {
     Connection* conn = (Connection*)arg;
     // Thread can handle background tasks like heartbeat
     return NULL;
 }
 
+/**
+ * @brief Establish a connection to a remote server
+ * 
+ * Creates a TCP socket, configures keepalive settings, and connects to the
+ * specified server. The operation is thread-safe using the connection's mutex.
+ * 
+ * @param conn Pointer to the Connection object
+ * @param ip IP address of the server to connect to
+ * @param port Port number of the server
+ * 
+ * @note If the socket is already created, it reuses the existing socket
+ * @note TCP keepalive is configured with: 60s idle, 10s interval, 5 probes
+ * @note A background thread is started after successful connection
+ */
 static void Connection_connect(Connection* conn, const char* ip, int port) {
     struct sockaddr_in server_address;
     
@@ -72,6 +106,20 @@ static void Connection_connect(Connection* conn, const char* ip, int port) {
     pthread_create(&conn->thread, NULL, connection_thread_function, conn);
 }
 
+/**
+ * @brief Write data to the connection
+ * 
+ * Sends data through the connection using either SSL_write() for encrypted
+ * connections or send() for plain TCP connections. The operation is thread-safe.
+ * 
+ * @param conn Pointer to the Connection object
+ * @param buffer Data buffer to write
+ * @param length Number of bytes to write
+ * @return ssize_t Number of bytes written, or -1 on error
+ * 
+ * @note If an error occurs, the connection is marked as disconnected
+ * @note The function automatically detects SSL vs plain TCP based on conn->ssl
+ */
 static ssize_t Connection_write(Connection* conn, const void* buffer, size_t length) {
     ssize_t result = -1;
     pthread_mutex_lock(&conn->mutex);
@@ -90,6 +138,22 @@ static ssize_t Connection_write(Connection* conn, const void* buffer, size_t len
     return result;
 }
 
+/**
+ * @brief Read data from the connection
+ * 
+ * Receives data from the connection using either SSL_read() for encrypted
+ * connections or recv() for plain TCP connections. The operation is thread-safe
+ * and includes a 2-second timeout.
+ * 
+ * @param conn Pointer to the Connection object
+ * @param buffer Buffer to store received data
+ * @param length Maximum number of bytes to read
+ * @return ssize_t Number of bytes read, 0 on connection close, -1 on error
+ * 
+ * @note A receive timeout of 2 seconds is set on the socket
+ * @note EAGAIN/EWOULDBLOCK errors are treated as no data available (return 0)
+ * @note If recv/SSL_read returns 0, the connection is marked as disconnected
+ */
 static ssize_t Connection_read(Connection* conn, void* buffer, size_t length) {
     ssize_t result = -1;
     pthread_mutex_lock(&conn->mutex);
@@ -118,7 +182,20 @@ static ssize_t Connection_read(Connection* conn, void* buffer, size_t length) {
     return result;
 }
 
-
+/**
+ * @brief Create a new Connection object
+ * 
+ * Allocates memory for a new Connection structure and initializes all
+ * fields to their default values. Method pointers are assigned to enable
+ * object-oriented usage.
+ * 
+ * @return Connection* Pointer to the newly created Connection object, or NULL on failure
+ * 
+ * @note The socket_fd is initialized to -1 (invalid)
+ * @note The connected flag is initialized to 0 (disconnected)
+ * @note The mutex is initialized for thread-safe operations
+ * @note SSL pointer is initialized to NULL
+ */
 Connection* Connection_create() {
     Connection* conn = (Connection*)malloc(sizeof(Connection));
     if (conn) {
@@ -134,6 +211,19 @@ Connection* Connection_create() {
     return conn;
 }
 
+/**
+ * @brief Destroy a Connection object and free its resources
+ * 
+ * Performs proper cleanup by shutting down SSL connections, closing sockets,
+ * waiting for background threads to terminate, and freeing allocated memory.
+ * 
+ * @param conn Pointer to the Connection object to destroy
+ * 
+ * @note It's safe to pass NULL to this function
+ * @note SSL connections are properly shut down before closing
+ * @note The function waits for the background thread to terminate
+ * @note The mutex is destroyed to prevent resource leaks
+ */
 void Connection_destroy(Connection* conn) {
     if (conn) {
         pthread_mutex_lock(&conn->mutex);
