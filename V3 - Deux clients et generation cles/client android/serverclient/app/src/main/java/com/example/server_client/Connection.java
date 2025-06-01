@@ -1,3 +1,11 @@
+/**
+ * @file Connection.java
+ * @brief SSL/TLS network connection management for Android
+ * @version 3.0
+ * @author Alexis DEVERCHERE
+ * @date 2025
+ */
+
 package com.example.server_client;
 
 import android.content.Context;
@@ -21,22 +29,65 @@ import javax.net.ssl.X509TrustManager;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * @brief SSL/TLS connection manager with dynamic certificate handling
+ * 
+ * This class manages secure network connections using SSL/TLS with support
+ * for dynamic certificate retrieval and trust store updates. It handles
+ * certificate validation failures by attempting to retrieve new certificates
+ * from the server.
+ */
 public class Connection {
+    /** @brief Tag for Android logging */
     private static final String TAG = "Connection";
+    
+    /** @brief Connection timeout in milliseconds */
     private static final int CONNECT_TIMEOUT = 5000; // 5 seconds
+    
+    /** @brief SSL socket for secure communication */
     private SSLSocket socket;
+    
+    /** @brief Thread-safe connection status flag */
     private AtomicBoolean connected = new AtomicBoolean(false);
+    
+    /** @brief Input stream for reading data */
     private InputStream inputStream;
+    
+    /** @brief Output stream for writing data */
     private OutputStream outputStream;
+    
+    /** @brief Android application context */
     private Context context;
 
+    /**
+     * @brief Constructor for Connection class
+     * 
+     * Initializes the connection manager with the provided Android context
+     * which is required for certificate management and file operations.
+     * 
+     * @param context Android application context
+     * 
+     * @note The context is used for accessing assets and internal storage
+     * @note No network connection is established until connect() is called
+     */
     public Connection(Context context) {
         this.context = context;
     }
 
     /**
-     * Attempts to connect with a trust manager that accepts any certificate
-     * to retrieve a new certificate from the server
+     * @brief Attempt connection with permissive certificate validation
+     * 
+     * This method creates a connection that accepts any certificate to retrieve
+     * a new certificate from the server. It then updates the trust store and
+     * reconnects securely with the new certificate.
+     * 
+     * @param ip Server IP address
+     * @param port Server port number
+     * @return boolean True if connection was successful, false otherwise
+     * 
+     * @note This method bypasses certificate validation temporarily
+     * @note Used as fallback when normal SSL handshake fails
+     * @note Automatically reconnects securely after certificate retrieval
      */
     private boolean connectWithNewCertificate(String ip, int port) {
         try {
@@ -95,7 +146,21 @@ public class Connection {
         }
     }
 
-    // Update the connect method for certificate handling
+    /**
+     * @brief Establish a secure connection to the server
+     * 
+     * Creates an SSL/TLS connection using the configured trust store. If the
+     * SSL handshake fails due to certificate issues, it attempts to retrieve
+     * a new certificate from the server and reconnect.
+     * 
+     * @param ip Server IP address
+     * @param port Server port number
+     * @return boolean True if connection was successful, false otherwise
+     * 
+     * @note Implements automatic certificate retrieval on handshake failure
+     * @note Configures socket with keepalive and read timeout
+     * @note Logs the cipher suite used for the connection
+     */
     public boolean connect(String ip, int port) {
         try {
             Log.d(TAG, "Connecting to " + ip + ":" + port);
@@ -158,7 +223,20 @@ public class Connection {
         }
     }
 
-
+    /**
+     * @brief Read data from the connection
+     * 
+     * Attempts to read data from the SSL socket input stream into the
+     * provided buffer. Handles timeout and error conditions gracefully.
+     * 
+     * @param buffer Byte array to store received data
+     * @param maxLength Maximum number of bytes to read
+     * @return int Number of bytes read, 0 for timeout, -1 for error/disconnection
+     * 
+     * @note Timeout conditions return 0 to allow retry
+     * @note Network errors result in connection being marked as disconnected
+     * @note Thread-safe operation using atomic boolean for connection state
+     */
     public int read(byte[] buffer, int maxLength) {
         if (!connected.get() || inputStream == null) {
             return -1;
@@ -179,6 +257,20 @@ public class Connection {
         }
     }
 
+    /**
+     * @brief Write data to the connection
+     * 
+     * Sends data through the SSL socket output stream. The data is
+     * immediately flushed to ensure transmission.
+     * 
+     * @param data Byte array containing data to send
+     * @param length Number of bytes to write from the array
+     * @return boolean True if write was successful, false otherwise
+     * 
+     * @note Output is automatically flushed after writing
+     * @note Write failures result in connection being marked as disconnected
+     * @note Thread-safe operation using atomic boolean for connection state
+     */
     public boolean write(byte[] data, int length) {
         if (!connected.get() || outputStream == null) {
             return false;
@@ -195,6 +287,16 @@ public class Connection {
         }
     }
 
+    /**
+     * @brief Close the connection and clean up resources
+     * 
+     * Gracefully closes the SSL socket and marks the connection as
+     * disconnected. Safe to call multiple times.
+     * 
+     * @note Thread-safe operation
+     * @note Does not throw exceptions on close errors
+     * @note Connection state is immediately updated
+     */
     public void close() {
         connected.set(false);
         try {
@@ -206,6 +308,18 @@ public class Connection {
         }
     }
 
+    /**
+     * @brief Check if the connection is currently active
+     * 
+     * Verifies both the internal connection state and the socket status
+     * to determine if the connection is usable.
+     * 
+     * @return boolean True if connected and socket is open, false otherwise
+     * 
+     * @note Thread-safe using atomic boolean
+     * @note Checks both internal state and actual socket status
+     * @note Connection state can change asynchronously due to network events
+     */
     public boolean isConnected() {
         return connected.get() && socket != null && socket.isConnected() && !socket.isClosed();
     }

@@ -1,3 +1,11 @@
+/**
+ * @file SSLUtil.java
+ * @brief SSL/TLS certificate management utilities for Android
+ * @version 3.0
+ * @author Alexis DEVERCHERE
+ * @date 2025
+ */
+
 package com.example.server_client;
 import android.content.Context;
 import android.util.Log;
@@ -16,12 +24,32 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 
+/**
+ * @brief Utility class for SSL/TLS certificate management and socket factory creation
+ * 
+ * This class provides functionality for managing server certificates dynamically,
+ * including extraction from certificate chains, updating stored certificates,
+ * and creating SSL socket factories with custom trust stores.
+ */
 public class SSLUtil {
+    /** @brief Tag for Android logging */
     private static final String TAG = "SSLUtil";
+    
+    /** @brief Currently stored server certificate */
     private static Certificate serverCertificate = null;
 
     /**
-     * Extract the primary certificate from a certificate chain
+     * @brief Extract the primary certificate from a certificate chain
+     * 
+     * Retrieves the first (leaf) certificate from a certificate chain,
+     * which typically represents the server's identity certificate.
+     * 
+     * @param chain Array of certificates forming the chain
+     * @return Certificate The primary certificate, or null if chain is empty
+     * 
+     * @note The first certificate in the chain is usually the server certificate
+     * @note Returns null for null or empty certificate chains
+     * @note Subsequent certificates in the chain are intermediate/root CAs
      */
     public static Certificate extractCertificateFromChain(Certificate[] chain) {
         if (chain != null && chain.length > 0) {
@@ -31,7 +59,16 @@ public class SSLUtil {
     }
 
     /**
-     * Update the stored server certificate with a new one
+     * @brief Update the stored server certificate with a new one
+     * 
+     * Replaces the currently stored server certificate with a new certificate,
+     * typically obtained from a recent connection to the server.
+     * 
+     * @param newCert The new certificate to store
+     * 
+     * @note Only updates if the new certificate is not null
+     * @note The certificate is stored in static memory until the app restarts
+     * @note Should be followed by saveServerCertificate() to persist to storage
      */
     public static void updateServerCertificate(Certificate newCert) {
         if (newCert != null) {
@@ -41,7 +78,16 @@ public class SSLUtil {
     }
 
     /**
-     * Save the current server certificate to internal storage
+     * @brief Save the current server certificate to internal storage
+     * 
+     * Persists the currently stored server certificate to the application's
+     * internal storage for retrieval across app restarts.
+     * 
+     * @param context Android application context for file operations
+     * 
+     * @note Saves to internal storage as "server_current.crt"
+     * @note Requires a certificate to be stored via updateServerCertificate()
+     * @note Logs errors if certificate encoding or file operations fail
      */
     public static void saveServerCertificate(Context context) {
         if (serverCertificate == null) {
@@ -62,7 +108,17 @@ public class SSLUtil {
     }
 
     /**
-     * Update certificate from an input stream
+     * @brief Update certificate from an input stream
+     * 
+     * Loads a certificate from an input stream and updates the stored
+     * server certificate. Useful for loading certificates from files or assets.
+     * 
+     * @param certStream Input stream containing X.509 certificate data
+     * @throws Exception If certificate parsing or stream reading fails
+     * 
+     * @note Expects X.509 format certificate data
+     * @note Replaces any previously stored certificate
+     * @note Stream is not closed by this method
      */
     public static void updateCertificate(InputStream certStream) throws Exception {
         if (certStream != null) {
@@ -73,7 +129,19 @@ public class SSLUtil {
     }
 
     /**
-     * Get an SSL socket factory configured with our trusted certificate
+     * @brief Get an SSL socket factory configured with trusted certificates
+     * 
+     * Creates an SSL socket factory that trusts the stored server certificate.
+     * If no certificate is stored, loads the initial certificate from assets.
+     * Falls back to default socket factory on errors.
+     * 
+     * @param context Android application context for accessing assets
+     * @return SSLSocketFactory Configured factory for creating SSL sockets
+     * 
+     * @note Uses stored certificate if available, otherwise loads from assets/server.crt
+     * @note Creates a custom KeyStore containing only the trusted server certificate
+     * @note Falls back to default socket factory if configuration fails
+     * @note The returned factory validates server certificates against the stored cert
      */
     public static SSLSocketFactory getSocketFactory(Context context) {
         try {
