@@ -18,16 +18,11 @@ Montrer qu’un **serveur TCP écrit en C** et une **application Android (Java)*
 | Lib | Atouts majeurs | Limites |
 |-----|----------------|---------|
 | **protobuf-c** | Génère du C pur, empreinte ≈ 200 Ko, utilisation directe de `malloc`/`free`, disponible dans les dépôts Debian | API simple mais manuelle ; pas de RPC intégré |
-| **Nanopb 0.4** | Empreinte ultra-faible (< 50 Ko), idéal micro-contrôleurs | Champs limités (repeated dyn.), pas de `oneof`, code généré moins lisible |
 | **FlatBuffers 24.x** | Zéro-copy, lecture directe en mémoire | Format plus verbeux que Protobuf, outillage C plus complexe |
 
-> **Constat :** pour un Raspberry Pi, **protobuf-c** représente le meilleur compromis « fonctionnalités vs taille binaire ». Nanopb viserait des MCU ; FlatBuffers répond à d’autres besoins (jeux, 3D).
+> **Constat :** pour un Raspberry Pi, **protobuf-c** représente le meilleur compromis « fonctionnalités vs taille binaire ». FlatBuffers répond à d’autres besoins (jeux, 3D).
 
 ### 2.2 · Protobuf sur Android
-
-| Composant | Depuis | Rôle / remarques |
-|-----------|--------|------------------|
-| **protobuf-javalite** | API 14 | Runtime léger (< 300 Ko), aucune reflection, recommandé par Google |
 
 *Choix retenu :* `protobuf-javalite` qui s’intègre nativement au plug-in Gradle `com.google.protobuf`.
 
@@ -107,11 +102,9 @@ Montrer qu’un **serveur TCP écrit en C** et une **application Android (Java)*
 
 ## 6 · Références
 
-1. Google — *Protocol Buffers Documentation* (consulté 05-2025)  
-2. MongoDB — *BSON Specification* (v1.1)  
-3. protobuf-c — *README* GitHub (v1.5)  
-4. FlatBuffers — *Whitepaper* (2024-11)  
-5. Nanopb — *User Guide* (2023-10)
+1. Medium - *Setting Up Protocol Buffers in an Android Project* (2024) <https://medium.com/@zekromvishwa56789/setting-up-protocol-buffers-in-an-android-project-8f7bad31981f>
+2. GitHub - *Protoc* - <https://github.com/protobuf-c/protobuf-c>
+3. Linuxembedded - *Introduction de Protobuf en C* <https://linuxembedded.fr/2023/11/introduction-de-protobuf-en-c>
 
 ---
 
