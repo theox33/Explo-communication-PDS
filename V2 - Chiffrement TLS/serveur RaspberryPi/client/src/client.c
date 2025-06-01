@@ -1,3 +1,11 @@
+/**
+ * @file client.c
+ * @author Théo AVRIL
+ * @brief Client TLS principal pour communication sécurisée avec le serveur.
+ * @date 2025-05-26
+ * @license MIT
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,13 +14,17 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/time.h>  // Pour struct timeval
-#include <sys/select.h>  // Pour fd_set
+#include <sys/time.h> 
+#include <sys/select.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 #include "../../common/communication.h"
 #include "../../common/connection.h"
 #include "../../common/protocol.h"
 
-#define SERVER_IP "172.23.3.21"  // Update to actual server IP
+
+#define SERVER_IP "127.0.0.1"
 #define PORT 5001
 #define BUFFER_SIZE 1024
 
@@ -21,11 +33,20 @@ Protocol* protocol = NULL;
 Communication* communication = NULL;
 int running = 1;
 
+/**
+ * @brief Callback pour gérer les messages reçus du serveur.
+ * @param[in] cmd Commande reçue.
+ * @param[in] param Paramètre associé à la commande.
+ */
 void message_handler(const char* cmd, const char* param) {
     printf("Received from server: %s\n", param);
     fflush(stdout);  // Ensure output is displayed immediately
 }
 
+/**
+ * @brief Gestionnaire du signal d'interruption pour arrêt propre.
+ * @param[in] sig Numéro du signal capturé.
+ */
 void signal_handler(int sig) {
     printf("\nExiting client application...\n");
     running = 0;
@@ -46,26 +67,37 @@ void signal_handler(int sig) {
     exit(0);
 }
 
+/**
+ * @brief Point d'entrée de l'application client.
+ * Initialise la connection TLS, le protocole et la communication,
+ * puis lance la boucle principale.
+ * @return Code de retour (0 si succès).
+ */
 int main() {
     char buffer[BUFFER_SIZE];
     signal(SIGINT, signal_handler);
 
-    // Create connection object
+    // Initialisation de la bibliothèque OpenSSL
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+    // Création de l'objet Connection
     connection = Connection_create();
     if (!connection) {
         fprintf(stderr, "Failed to create Connection object\n");
         return 1;
     }
-    
-    // Create protocol object
+
+    // Création de l'objet Protocol
     protocol = Protocol_create();
     if (!protocol) {
         fprintf(stderr, "Failed to create Protocol object\n");
         Connection_destroy(connection);
         return 1;
     }
-    
-    // Create communication object
+
+    // Création de l'objet Communication
     communication = Communication_create(connection, protocol);
     if (!communication) {
         fprintf(stderr, "Failed to create Communication object\n");
@@ -73,18 +105,57 @@ int main() {
         Connection_destroy(connection);
         return 1;
     }
-    
-    // Set message handler
+
+    // Définition du gestionnaire de messages
     communication->setMessageHandler(communication, message_handler);
-    
-    // Connect to server
+
+    // Connexion au serveur
     printf("Connecting to %s:%d...\n", SERVER_IP, PORT);
     connection->connect(connection, SERVER_IP, PORT);
 
-    // Wait for connection to establish
+    // --- SSL/TLS handshake ---
+    if (connection->connected) {
+        const SSL_METHOD *method = TLS_client_method();
+        SSL_CTX *ctx = SSL_CTX_new(method);
+        if (!ctx) {
+            fprintf(stderr, "SSL_CTX_new failed\n");
+            Communication_destroy(communication);
+            Protocol_destroy(protocol);
+            Connection_destroy(connection);
+            return 1;
+        }
+
+        SSL *ssl = SSL_new(ctx);
+        if (!ssl) {
+            fprintf(stderr, "SSL_new failed\n");
+            SSL_CTX_free(ctx);
+            Communication_destroy(communication);
+            Protocol_destroy(protocol);
+            Connection_destroy(connection);
+            return 1;
+        }
+
+        SSL_set_fd(ssl, connection->socket_fd);
+
+        if (SSL_connect(ssl) <= 0) {
+            fprintf(stderr, "SSL_connect failed\n");
+            ERR_print_errors_fp(stderr);
+            SSL_free(ssl);
+            SSL_CTX_free(ctx);
+            Communication_destroy(communication);
+            Protocol_destroy(protocol);
+            Connection_destroy(connection);
+            return 1;
+        }
+
+        printf("SSL connection established with cipher: %s\n", SSL_get_cipher(ssl));
+        connection->ssl = ssl;
+    }
+    // --- End SSL/TLS handshake ---
+    // Attendre un peu pour s'assurer que la connexion est établie
     sleep(1);
     
-    // Check connection status
+    // Vérifier si la connexion a réussi
     if (!connection->connected) {
         fprintf(stderr, "Failed to connect to server\n");
         Communication_destroy(communication);
@@ -95,14 +166,14 @@ int main() {
     
     printf("Connected to server successfully\n");
 
-    // Start communication thread
+    // Démarrer le thread de communication
     communication->run(communication);
     
-    // Send initial test message
+    // Envoi d'un message de test au serveur
     printf("Sending test message to server...\n");
     communication->comX(communication, "Test message from client");
     
-    // Main input loop
+    // Boucle principale pour lire les entrées de l'utilisateur
     printf("Enter messages (type 'exit' to quit):\n");
 
     printf("> ");
@@ -110,39 +181,39 @@ int main() {
     while (running && connection->connected) {
         fflush(stdout);
         
-        // Check for disconnection before attempting to read input
+        // Vérifier si la connexion est toujours active
         if (!connection->connected) {
             printf("Connection to server lost\n");
             break;
         }
         
-        // Set up a non-blocking way to check for input
+        // Utiliser select pour attendre l'entrée de l'utilisateur avec un timeout
         struct timeval tv = {0, 100000}; // 100ms timeout
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
         
-        // Check if input is available
+        // Vérifier si l'entrée est prête
         int select_result = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
         
         if (select_result > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
-            // Input is available
+            // Si l'entrée est prête
             if (!fgets(buffer, BUFFER_SIZE, stdin)) {
                 break;
             }
             
-            // Remove newline
+            // Supprimer le caractère de nouvelle ligne à la fin
             size_t len = strlen(buffer);
             if (len > 0 && buffer[len-1] == '\n') {
                 buffer[len-1] = '\0';
             }
             
-            // Check for exit command
+            // Vérifier si l'utilisateur veut quitter
             if (strcmp(buffer, "exit") == 0) {
                 break;
             }
             
-            // Send message
+            // Envoyer le message au serveur
             if (connection->connected) {
                 printf("Sending: %s\n", buffer);
                 printf("> ");
@@ -152,14 +223,13 @@ int main() {
                 break;
             }
         }
-        
-        // Small delay to prevent CPU hogging
+
         usleep(10000);
     }
 
     printf("Shutting down client...\n");
     
-    // Clean up resources
+    // Arrêter la communication et libérer les ressources
     if (communication) {
         communication->stop(communication);
         Communication_destroy(communication);

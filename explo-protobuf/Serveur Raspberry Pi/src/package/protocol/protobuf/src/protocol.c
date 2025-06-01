@@ -18,7 +18,7 @@ uint8_t* protocol_encrypt_message(const char* plain_text, size_t* out_size) {
     char* encrypted = strdup(plain_text);
     xor_cipher(encrypted, strlen(encrypted));
 
-    // 🔍 Affichage du message chiffré avant Protobuf
+    // Affichage du message chiffré avant Protobuf
     printf("Encrypted (XORed) message: ");
     for (size_t i = 0; i < strlen(encrypted); i++) {
         printf("\\x%02X", (unsigned char)encrypted[i]);
@@ -41,7 +41,7 @@ uint8_t* protocol_encrypt_message(const char* plain_text, size_t* out_size) {
 
 
 char* protocol_decrypt_message(const uint8_t* data, size_t size) {
-    // 🔍 Affiche les octets bruts reçus
+    // Affiche les octets bruts reçus
     printf("Received serialized data (%ld bytes): ", size);
     for (size_t i = 0; i < size; ++i) {
         printf("\\x%02X", data[i]);
@@ -55,7 +55,7 @@ char* protocol_decrypt_message(const uint8_t* data, size_t size) {
         return NULL;
     }
 
-    // 🔍 Affiche le message chiffré contenu dans content
+    // Affiche le message chiffré contenu dans content
     printf("Encrypted message (protobuf content): ");
     for (size_t i = 0; i < strlen(msg->content); ++i) {
         printf("\\x%02X", (unsigned char)msg->content[i]);
@@ -66,7 +66,7 @@ char* protocol_decrypt_message(const uint8_t* data, size_t size) {
     char* decrypted = strdup(msg->content);
     xor_cipher(decrypted, strlen(decrypted));
 
-    // 🔍 Affiche le résultat final
+    // Affiche le résultat final
     printf("Decrypted message: %s\n", decrypted);
 
     amessage__free_unpacked(msg, NULL);

@@ -6,6 +6,11 @@
     android:orientation="vertical"
     android:padding="16dp"
     tools:context=".Connection">
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="45dp" />
+
     <Button
         android:id="@+id/connect_button"
         android:layout_width="match_parent"
@@ -28,6 +33,7 @@
             android:padding="8dp"
             android:textSize="16sp" />
     </ScrollView>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -39,7 +45,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="Enter message"
-            android:inputType="text" />
+            android:inputType="text"
+            android:minHeight="48dp" />
         <Button
             android:id="@+id/send_button"
             android:layout_width="wrap_content"

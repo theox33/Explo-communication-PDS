@@ -1,4 +1,3 @@
-// protocol.c
 #include "protocol.h"
 
 static void Protocol_encodeMessage(Protocol* protocol, const char* cmd, const char* param, char* out_buffer) {

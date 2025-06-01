@@ -1,4 +1,15 @@
-// server.c
+/**
+ * @file server.c
+ * @author Théo AVRIL
+ * @brief Serveur principal TLS pour communication sécurisée avec les clients.
+ * @date 2025-05-26
+ * @license MIT
+ *
+ * Ce fichier implémente un serveur TCP sécurisé par TLS/SSL, capable de gérer plusieurs clients
+ * en parallèle grâce à des threads. Il utilise OpenSSL pour la gestion des connexions sécurisées
+ * et propose une interface de communication permettant pour plus tard de gérer différents types de messages.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +19,8 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
-
-
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
@@ -25,44 +33,56 @@
 #define PORT 5001
 #define MAX_CLIENTS 2
 
+/**
+ * @struct ClientInfo
+ * @brief Structure contenant les informations d'un client connecté.
+ */
 typedef struct {
-    int client_socket;
-    struct sockaddr_in client_addr;
-    int id;
+    int client_socket;  /**< Descripteur de socket du client */
+    struct sockaddr_in client_addr; /**< Adresse du client */
+    int id; /**< Identifiant du client */
 } ClientInfo;
 
-// Structure to track clients IDs with their communication objects
+/**
+ * @struct ClientMapping
+ * @brief Structure pour mapper un identifiant de client à sa communication.
+ */
 typedef struct {
-    int id;
-    Communication* comm;
+    int id; /**< Identifiant du client */
+    Communication* comm;    /**< Pointeur vers la communication du client */
 } ClientMapping;
 
-// Global TLS context pointer
+// Pointeur vers le contexte SSL
 SSL_CTX* ssl_ctx = NULL;
 
+// Tableaux pour stocker les connexions et communications des clients
 Connection* server_connections[MAX_CLIENTS] = {NULL};
 Communication* server_communications[MAX_CLIENTS] = {NULL};
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int server_socket;
 int running_server = 1;
 
-// Message handler with improved debugging
+/**
+ * @brief Gère le traitement des messages reçus de clients.
+ * @param[in] cmd Commande reçue.
+ * @param[in] param Paramètre associé à la commande.
+ * @param[in] sender_id Identifiant du client émetteur.
+ */
 void message_handler(const char* cmd, const char* param, int sender_id) {
     pthread_t tid = pthread_self();
-    printf("Thread %lu (client %d) received: Command='%s', Param='%s'\n", 
-           (unsigned long)tid, sender_id, cmd, param);
+    printf("Thread %lu (client %d) received: Command='%s', Param='%s'\n", (unsigned long)tid, sender_id, cmd, param);
     fflush(stdout);
 
     if (strcmp(cmd, "CMD_X") == 0) {
         printf("Client %d says: %s\n", sender_id, param);
         
-        // Create a message that includes sender information
+        // Création du message complet à propager
         char full_message[BUFFER_SIZE];
         snprintf(full_message, BUFFER_SIZE, "Client %d: %s", sender_id, param);
         
         pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            // Send to everyone except the original sender
+            // Propagation du message aux autres clients
             if (server_communications[i] && i != sender_id) {
                 server_communications[i]->comY(server_communications[i], full_message);
             }
@@ -76,7 +96,11 @@ void message_handler(const char* cmd, const char* param, int sender_id) {
     fflush(stdout);
 }
 
-// Client handler thread function
+/**
+ * @brief Thread gérant la connexion et l'échange avec un client.
+ * @param[in,out] arg Pointeur vers la structure ClientInfo contenant les informations du client.
+ * @return NULL.
+ */
 void* client_handler(void* arg) {
     ClientInfo* client_info = (ClientInfo*)arg;
     int client_socket = client_info->client_socket;
@@ -87,13 +111,13 @@ void* client_handler(void* arg) {
            inet_ntoa(client_info->client_addr.sin_addr), 
            ntohs(client_info->client_addr.sin_port));
 
-    // Create connection object
+    // Creation de la structure de connexion
     Connection* connection = Connection_create();
     connection->socket_fd = client_socket;
     connection->connected = 1;
     
     // *** TLS Handshake ***
-    // Create an SSL object using the global TLS context.
+    // Initialisation de la communication SSL/TLS
     SSL* ssl = SSL_new(ssl_ctx);
     if (!ssl) {
         ERR_print_errors_fp(stderr);
@@ -102,7 +126,7 @@ void* client_handler(void* arg) {
         return NULL;
     }
     SSL_set_fd(ssl, client_socket);
-    // After successful SSL_accept in client_handler:
+    // Après avoir configuré le contexte SSL, on effectue le handshake
     if (SSL_accept(ssl) <= 0) {
         ERR_print_errors_fp(stderr);
         SSL_free(ssl);
@@ -111,17 +135,16 @@ void* client_handler(void* arg) {
         return NULL;
     }
 
-    // Retrieve and log the cipher suite used for the connection
+    // Récupération du cipher utilisé pour la connexion SSL
     const char* cipher = SSL_get_cipher(ssl);
     printf("SSL connection established with cipher: %s\n", cipher);
-    // Save the SSL pointer in the connection so that our read/write functions use it.
+    // Enregistrement de la connexion SSL dans la structure Connection
     connection->ssl = ssl;
-    // ********************************
 
-    // Create protocol object
+
     Protocol* protocol = Protocol_create();
     
-    // Create communication object
+    // Association de la connexion et de la communication
     Communication* communication = Communication_create(connection, protocol);
     communication->client_id = client_id;
     communication->setMessageHandler(communication, message_handler);
@@ -131,16 +154,18 @@ void* client_handler(void* arg) {
     server_communications[client_id] = communication;
     pthread_mutex_unlock(&clients_mutex);
     
-    // Start the communication
+    // Début du thread de communication
     communication->run(communication);
     
     printf("Sending welcome message to client %d\n", client_id);
     communication->comX(communication, "Welcome to the server!");
     
+    // Boucle d'attente pour recevoir des messages du client
     while (connection->connected && running_server) {
         sleep(1);
     }
     
+    // Fermeture de la connexion et nettoyage des ressources
     pthread_mutex_lock(&clients_mutex);
     printf("Cleaning up resources for client %d\n", client_id);
     communication->stop(communication);
@@ -156,6 +181,10 @@ void* client_handler(void* arg) {
     return NULL;
 }
 
+/**
+ * @brief Handler pour le signal SIGINT afin d'arrêter proprement le serveur.
+ * @param[in] signal Numéro du signal reçu.
+ */
 void signal_sigint_handler(int signal) {
     fprintf(stdout, "\nServer shutting down...\n");
     running_server = 0;
@@ -163,6 +192,7 @@ void signal_sigint_handler(int signal) {
         close(server_socket);
     }
     
+    // Arrêt de tous les clients connectés
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (server_communications[i]) {
@@ -177,7 +207,7 @@ void signal_sigint_handler(int signal) {
     }
     pthread_mutex_unlock(&clients_mutex);
 
-    // Free the global SSL context
+    // Libération des ressources SSL
     if (ssl_ctx) {
         SSL_CTX_free(ssl_ctx);
     }
@@ -185,25 +215,32 @@ void signal_sigint_handler(int signal) {
     exit(EXIT_SUCCESS);
 }
 
-// Function to generate SSL keys dynamically
+/**
+ * @brief Génère de nouvelles clés SSL pour le serveur si elles n'existent pas.
+ * @param[in] cert_path Chemin du fichier de certificat à créer.
+ * @param[in] key_path Chemin du fichier de clé privée à créer.
+ * @return 1 si la génération a réussi, 0 sinon.
+ */
 int generate_server_keys(const char* cert_path, const char* key_path) {
     printf("Generating new SSL keys...\n");
     
-    // Generate a new RSA key pair
+    // Génération de la clé privée RSA
     RSA *rsa = RSA_generate_key(2048, RSA_F4, NULL, NULL);
     if (!rsa) {
         ERR_print_errors_fp(stderr);
         return 0;
     }
     
-    // Create a new private key file
+    // Création du fichier de clé privée
     FILE *private_key_file = fopen(key_path, "wb");
     if (!private_key_file) {
         perror("Failed to open private key file");
+        fprintf(stderr, "Keypass: %s\n", key_path);
         RSA_free(rsa);
         return 0;
     }
     
+    // Écriture de la clé privée dans le fichier
     if (!PEM_write_RSAPrivateKey(private_key_file, rsa, NULL, NULL, 0, NULL, NULL)) {
         ERR_print_errors_fp(stderr);
         fclose(private_key_file);
@@ -212,7 +249,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
     }
     fclose(private_key_file);
     
-    // Now generate a self-signed certificate
+    // Création du certificat auto-signé
     X509 *x509 = X509_new();
     if (!x509) {
         ERR_print_errors_fp(stderr);
@@ -220,29 +257,29 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
-    // Set version
+    // Sélection de la version du certificat
     X509_set_version(x509, 2); // X509v3
     
-    // Set serial number
+    // Sélection de l'algorithme de signature
     ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
     
-    // Set validity period
-    X509_gmtime_adj(X509_get_notBefore(x509), 0); // Valid from now
-    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // Valid for one year
+    // Sélection de la période de validité du certificat
+    X509_gmtime_adj(X509_get_notBefore(x509), 0); // Valide depuis maintenant
+    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // Valide pour 1 an
     
-    // Set public key
+    // Ajout de la clé publique au certificat
     EVP_PKEY *pkey = EVP_PKEY_new();
     EVP_PKEY_assign_RSA(pkey, rsa);
     X509_set_pubkey(x509, pkey);
     
-    // Set subject and issuer
+    // Définition des informations du sujet du certificat
     X509_NAME *name = X509_get_subject_name(x509);
-    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (unsigned char *)"US", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (unsigned char *)"MyApp Server", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char *)"localhost", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (unsigned char *)"FR", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (unsigned char *)"Orion", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char *)"Hermes", -1, -1, 0);
     X509_set_issuer_name(x509, name);
     
-    // Sign the certificate with our private key
+    // Signature du certificat avec la clé privée
     if (!X509_sign(x509, pkey, EVP_sha256())) {
         ERR_print_errors_fp(stderr);
         X509_free(x509);
@@ -250,7 +287,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
-    // Write the certificate to file
+    // Création du fichier de certificat
     FILE *cert_file = fopen(cert_path, "wb");
     if (!cert_file) {
         perror("Failed to open certificate file");
@@ -259,6 +296,7 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
         return 0;
     }
     
+    // Écriture du certificat dans le fichier
     if (!PEM_write_X509(cert_file, x509)) {
         ERR_print_errors_fp(stderr);
         fclose(cert_file);
@@ -275,9 +313,13 @@ int generate_server_keys(const char* cert_path, const char* key_path) {
     return 1;
 }
 
+/**
+ * @brief Point d'entrée du serveur. Initialise le contexte SSL, configure le socket, et gère les connexions entrantes.
+ * @return Code de sortie, 0 si succès, sinon code d'erreur.
+ */
 int main() {
-    load_env_file(".ini");
-    // Load environment variables
+    load_env_file("./src/.ini");
+    // Chargement des variables d'environnement
     const char *cert_path = get_env_value("CERT_PATH");
     const char *key_path = get_env_value("KEY_PATH");
     if (!cert_path || !key_path) {
@@ -285,21 +327,25 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Initialize OpenSSL
+    // Initialisation du contexte SSL
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
     
-    // Generate new keys each time server starts
-    if (!generate_server_keys(cert_path, key_path)) {
-        fprintf(stderr, "Failed to generate server keys\n");
-        exit(EXIT_FAILURE);
+    // Génération des clés SSL si elles n'existent pas
+    if (access(cert_path, F_OK) == -1) {
+        if (!generate_server_keys(cert_path, key_path)) {
+            fprintf(stderr, "Failed to generate SSL keys.\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        printf("SSL keys already exist, using existing files.\n");
     }
 
     signal(SIGINT, signal_sigint_handler);
     struct sockaddr_in server_address;
     
-    // Create server socket
+    // Création du socket serveur
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket == -1) {
         perror("Socket creation failed");
@@ -312,13 +358,15 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    // Set up TLS context with the newly generated keys
+    // Création du contexte SSL
     const SSL_METHOD *method = TLS_server_method();
     ssl_ctx = SSL_CTX_new(method);
     if (!ssl_ctx) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
+
+    // Chargement du certificat et de la clé privée
     if (SSL_CTX_use_certificate_file(ssl_ctx, cert_path, SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
@@ -328,17 +376,20 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
+    // Configuration de l'adresse du serveur
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = INADDR_ANY;
     server_address.sin_port = htons(PORT);
     
+    // Liaison du socket à l'adresse et au port
     if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
         perror("Bind failed");
         close(server_socket);
         exit(EXIT_FAILURE);
     }
     
+    // Mise en écoute du socket
     if (listen(server_socket, 5) == -1) {
         perror("Listen failed");
         close(server_socket);
@@ -348,6 +399,7 @@ int main() {
     printf("Server started on port %d\nWaiting for client connections...\n", PORT);
     fflush(stdout);
     
+    // Boucle principale pour accepter les connexions des clients
     while (running_server) {
         ClientInfo* client_info = malloc(sizeof(ClientInfo));
         if (!client_info) {
@@ -355,10 +407,9 @@ int main() {
             continue;
         }
         
+        // Acceptation d'une nouvelle connexion client
         socklen_t client_addr_len = sizeof(client_info->client_addr);
-        client_info->client_socket = accept(server_socket, 
-                                           (struct sockaddr*)&client_info->client_addr, 
-                                           &client_addr_len);
+        client_info->client_socket = accept(server_socket, (struct sockaddr*)&client_info->client_addr, &client_addr_len);
         if (client_info->client_socket == -1) {
             if (errno == EINTR) {
                 if (!running_server) {
@@ -372,6 +423,7 @@ int main() {
             continue;
         }
         
+        // Vérification de la limite de clients
         pthread_mutex_lock(&clients_mutex);
         int slot = -1;
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -381,6 +433,7 @@ int main() {
             }
         }
         
+        // Si le serveur est plein, on refuse la connexion
         if (slot == -1) {
             pthread_mutex_unlock(&clients_mutex);
             printf("Server full, rejecting connection\n");
@@ -389,9 +442,11 @@ int main() {
             continue;
         }
         
+        // Enregistrement de l'identifiant du client
         client_info->id = slot;
         pthread_mutex_unlock(&clients_mutex);
         
+        // Création du thread pour gérer le client
         pthread_t client_thread;
         if (pthread_create(&client_thread, NULL, client_handler, client_info) != 0) {
             perror("Thread creation failed");

@@ -17,9 +17,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
-// Le thread peut gérer des tâches en arrière-plan comme le heartbeat
 static void* connection_thread_function(void* arg) {
-    Connection* conn = (Connection*)arg;
     return NULL;
 }
 
@@ -43,6 +41,7 @@ static void Connection_connect(Connection* conn, const char* ip, int port) {
         int keepintvl = 10; // Envoyer une sonde toutes les 10 secondes
         int keepcnt = 5;    // Déconnecter après 5 sondes échouées
 
+        // Configurer les options de keep-alive
         setsockopt(conn->socket_fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(keepalive));
         setsockopt(conn->socket_fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(keepidle));
         setsockopt(conn->socket_fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(keepintvl));

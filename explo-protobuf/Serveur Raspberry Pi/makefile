@@ -91,5 +91,11 @@ distclean: clean
 # Include dependencies
 -include $(DEP)
 
+docs:
+	doxygen Doxyfile
+
+docs-clean:
+	rm -rf docs/html docs/latex
+
 # Phony targets
-.PHONY: all clean distclean rebuild debug run-server run-client
+.PHONY: all clean distclean rebuild debug run-server run-client docs docs-clean

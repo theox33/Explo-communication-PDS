@@ -1,4 +1,5 @@
 package com.example.server_client;
+
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,20 +10,28 @@ import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+/**
+ * Activité principale de l'application client.
+ * Gère l'interface utilisateur et la communication avec le serveur.
+ */
 public class MainActivity extends AppCompatActivity {
-    private Client client;
-    private EditText messageInput;
-    private Button sendButton;
-    private Button connectButton;
-    private TextView messagesDisplay;
-    private ScrollView scrollView;
-    private Handler mainHandler;
+    private TextView ipInput; // Champ de saisie de l'adresse IP
+    private Client client; // Instance du client réseau
+    private EditText messageInput; // Champ de saisie du message
+    private Button sendButton; // Bouton d'envoi
+    private Button connectButton; // Bouton de connexion/déconnexion
+    private TextView messagesDisplay; // Affichage des messages
+    private ScrollView scrollView; // Pour faire défiler les messages
+    private Handler mainHandler; // Handler pour exécuter du code sur le thread principal
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize UI components
+        // Initialisation des composants de l'UI
+        ipInput = findViewById(R.id.ip_input);
         messageInput = findViewById(R.id.message_input);
         sendButton = findViewById(R.id.send_button);
         connectButton = findViewById(R.id.connect_button);
@@ -31,12 +40,12 @@ public class MainActivity extends AppCompatActivity {
 
         mainHandler = new Handler(Looper.getMainLooper());
 
-        // Create client instance
+        // Création du client et définition du listener pour les messages reçus
         client = new Client(this);
         client.setMessageListener(new Client.MessageListener() {
             @Override
             public void onMessageReceived(final String message) {
-                // Update UI on main thread
+                // Mise à jour de l'UI sur le thread principal
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -46,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Set up connect button
+        // Gestion du clic sur le bouton de connexion/déconnexion
         connectButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -58,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Set up send button
+        // Gestion du clic sur le bouton d'envoi
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -69,14 +78,16 @@ public class MainActivity extends AppCompatActivity {
         updateUI();
     }
 
+    /**
+     * Tente de se connecter au serveur dans un thread séparé.
+     */
     private void connectToServer() {
-        // Connection should be done in a background thread
         new Thread(new Runnable() {
             @Override
             public void run() {
-                final boolean success = client.connectToServer();
+                final boolean success = client.connectToServer(getIp());
 
-                // Update UI on main thread
+                // Mise à jour de l'UI selon le résultat
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -96,6 +107,9 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * Déconnecte le client du serveur dans un thread séparé.
+     */
     private void disconnectFromServer() {
         new Thread(new Runnable() {
             @Override
@@ -115,6 +129,9 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * Envoie un message au serveur.
+     */
     private void sendMessage() {
         final String message = messageInput.getText().toString().trim();
 
@@ -149,6 +166,18 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    /**
+     * Récupère l'adresse IP saisie par l'utilisateur.
+     * @return L'adresse IP sous forme de chaîne.
+     */
+    private String getIp() {
+        return ipInput.getText().toString().trim();
+    }
+
+    /**
+     * Ajoute un message à l'affichage et fait défiler vers le bas.
+     * @param message Le message à afficher.
+     */
     private void appendMessage(String message) {
         messagesDisplay.append(message + "\n\n");
         scrollView.post(new Runnable() {
@@ -159,19 +188,25 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Met à jour l'état de l'UI selon la connexion.
+     */
     private void updateUI() {
         boolean connected = client.isConnected();
         sendButton.setEnabled(connected);
 
         if (connected) {
             connectButton.setText("Disconnect");
+            ipInput.setEnabled(false);
         } else {
             connectButton.setText("Connect");
+            ipInput.setEnabled(true);
         }
     }
 
     @Override
     protected void onDestroy() {
+        // Déconnexion propre lors de la destruction de l'activité
         if (client != null && client.isConnected()) {
             client.disconnect();
         }

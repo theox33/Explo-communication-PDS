@@ -1,21 +1,23 @@
-// communication.c
 #include "communication.h"
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
 
+// Fonction pour envoyer un message de type X
 static void Communication_comX(Communication* comm, const char* param) {
     char buffer[BUFFER_SIZE];
     comm->protocol->encodeMessage(comm->protocol, comm->protocol->cmdX, param, buffer);
     comm->connection->write(comm->connection, buffer, strlen(buffer) + 1);
 }
 
+// Fonction pour envoyer un message de type Y
 static void Communication_comY(Communication* comm, const char* param) {
     char buffer[BUFFER_SIZE];
     comm->protocol->encodeMessage(comm->protocol, comm->protocol->cmdY, param, buffer);
     comm->connection->write(comm->connection, buffer, strlen(buffer) + 1);
 }
 
+// Fonction de thread pour gérer la communication
 static void* communication_thread_function(void* arg) {
     Communication* comm = (Communication*)arg;
     char buffer[BUFFER_SIZE];
@@ -134,7 +136,6 @@ void Communication_destroy(Communication* comm) {
             comm->stop(comm);
         }
         
-        // Ne pas détruire la connexion et le protocole ici car ils peuvent être partagés
         free(comm);
     }
 }

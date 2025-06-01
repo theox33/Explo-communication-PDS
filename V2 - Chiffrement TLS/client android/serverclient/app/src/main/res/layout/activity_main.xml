@@ -6,6 +6,19 @@
     android:orientation="vertical"
     android:padding="16dp"
     tools:context=".MainActivity">
+
+
+    <EditText
+        android:id="@+id/ip_input"
+        android:layout_width="379dp"
+        android:layout_height="wrap_content"
+        android:ems="10"
+        android:hint="Enter server's IP address"
+        android:inputType="text"
+        android:minHeight="48dp"
+        android:text="10.209.27.229"
+        tools:text="Ip address" />
+
     <Button
         android:id="@+id/connect_button"
         android:layout_width="match_parent"
@@ -39,7 +52,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="Enter message"
-            android:inputType="text" />
+            android:inputType="text"
+            android:minHeight="48dp" />
         <Button
             android:id="@+id/send_button"
             android:layout_width="wrap_content"
@@ -47,4 +61,5 @@
             android:enabled="false"
             android:text="Send" />
     </LinearLayout>
+
 </LinearLayout>
