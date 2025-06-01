@@ -1,5 +1,7 @@
-syntax = "proto3";
+syntax = "proto3"; // Spécifie la syntaxe Protobuf version 3
 
+// Définition d'un message Protobuf nommé "AMessage"
+// Ce message contient un seul champ texte nommé "content"
 message AMessage {
-  string content = 1;
+  string content = 1; // Champ texte principal du message (numéro de champ 1)
 }
