@@ -69,7 +69,7 @@ $(BUILD_DIR)/common/%.o: $(COMMON_DIR)/%.c
 run: 
 	@ echo "\n==== Run ${EXEC_NAME} ========="
 	${EXEC}
-	@ echo "==== Run Alambix done ====\n"
+	@ echo "==== Run Client done ====\n"
 
 # Clean the project
 clean:

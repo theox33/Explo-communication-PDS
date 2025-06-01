@@ -9,11 +9,20 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 
+/**
+ * @class SSLUtil
+ * @brief Utilitaire pour créer une SSLSocketFactory personnalisée avec un certificat auto-signé.
+ */
 public class SSLUtil {
 
+    /**
+     * @brief Retourne une SSLSocketFactory configurée avec un certificat de confiance personnalisé.
+     * @param context Le contexte Android pour accéder aux assets.
+     * @return Une instance de SSLSocketFactory prête à l'emploi.
+     */
     public static SSLSocketFactory getSocketFactory(Context context) {
         try {
-            // Load the self-signed certificate from assets
+            // Charge le certificat auto-signé depuis les assets
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             InputStream caInput = context.getAssets().open("server.crt");
             Certificate ca;
@@ -23,18 +32,18 @@ public class SSLUtil {
                 caInput.close();
             }
 
-            // Create a KeyStore containing our trusted CAs
+            // Crée un KeyStore contenant le certificat de confiance
             String keyStoreType = KeyStore.getDefaultType();
             KeyStore keyStore = KeyStore.getInstance(keyStoreType);
             keyStore.load(null, null);
             keyStore.setCertificateEntry("server", ca);
 
-            // Create a TrustManager that trusts the CAs in our KeyStore
+            // Crée un TrustManager qui fait confiance au certificat du KeyStore
             String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
             tmf.init(keyStore);
 
-            // Create an SSLContext that uses our TrustManager
+            // Crée un SSLContext utilisant ce TrustManager
             SSLContext contextSSL = SSLContext.getInstance("TLS");
             contextSSL.init(null, tmf.getTrustManagers(), null);
             return contextSSL.getSocketFactory();

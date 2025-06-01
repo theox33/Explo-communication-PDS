@@ -7,7 +7,7 @@
  *
  * Ce fichier implémente un serveur TCP sécurisé par TLS/SSL, capable de gérer plusieurs clients
  * en parallèle grâce à des threads. Il utilise OpenSSL pour la gestion des connexions sécurisées
- * et propose une interface de communication basée sur des protocoles personnalisés.
+ * et propose une interface de communication permettant pour plus tard de gérer différents types de messages.
  */
 
 #include <stdio.h>
