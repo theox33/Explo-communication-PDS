@@ -2,70 +2,77 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define PORT 12345       // Port d'écoute
-#define MAX_BUF_SIZE 1024  // Taille du buffer pour les messages reçus
+#define PORT 8080
+#define BUFFER_SIZE 1024
 
 int main() {
-    int server_fd, client_fd;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t addr_len = sizeof(client_addr);
-    char buffer[MAX_BUF_SIZE];
-    int bytes_read;
-
-    // Création de la socket TCP
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("Erreur lors de la création de la socket");
+    int server_fd, new_socket;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+    char buffer[BUFFER_SIZE] = {0};
+    char *response = "Message reçu par le serveur C";
+    
+    // Création du socket
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("Échec de création du socket");
         exit(EXIT_FAILURE);
     }
-
-    // Configuration de l'adresse du serveur
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;  // Ecouter sur toutes les interfaces
-    server_addr.sin_port = htons(PORT);       // Port d'écoute
-
-    // Lier la socket à l'adresse et au port
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Erreur lors du bind");
-        close(server_fd);
+    
+    // Configuration des options du socket
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR , &opt, sizeof(opt))) {
+        perror("Échec setsockopt");
         exit(EXIT_FAILURE);
     }
-
-    // Mise en écoute de la socket
-    if (listen(server_fd, 1) == -1) {
-        perror("Erreur lors de l'écoute");
-        close(server_fd);
+    
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+    
+    // Liaison du socket
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("Échec du bind");
         exit(EXIT_FAILURE);
     }
-
-    printf("Serveur en écoute sur le port %d...\n", PORT);
-
-    // Attente de connexion d'un client
-    if ((client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len)) == -1) {
-        perror("Erreur lors de l'acceptation de la connexion");
-        close(server_fd);
+    
+    // Écoute des connexions
+    if (listen(server_fd, 3) < 0) {
+        perror("Échec du listen");
         exit(EXIT_FAILURE);
     }
-
-    printf("Client connecté : %s\n", inet_ntoa(client_addr.sin_addr));
-
-    // Boucle de réception des messages du client (tablette)
-    while ((bytes_read = read(client_fd, buffer, MAX_BUF_SIZE)) > 0) {
-        buffer[bytes_read] = '\0';  // S'assurer que le message est terminé par un caractère nul
-        printf("Message reçu : %s\n", buffer);
+    
+    printf("Serveur C en écoute sur le port %d...\n", PORT);
+    
+    while (1) {
+        // Accepter une connexion
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
+            perror("Échec de l'accept");
+            exit(EXIT_FAILURE);
+        }
+        
+        printf("Connexion acceptée depuis %s:%d\n", 
+               inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+        
+        // Lire le message du client
+        int valread = read(new_socket, buffer, BUFFER_SIZE);
+        if (valread > 0) {
+            printf("Message reçu: %s\n", buffer);
+            
+            // Envoyer une réponse
+            send(new_socket, response, strlen(response), 0);
+            printf("Réponse envoyée\n");
+        }
+        
+        // Fermer la connexion
+        close(new_socket);
+        memset(buffer, 0, BUFFER_SIZE);
     }
-
-    if (bytes_read == -1) {
-        perror("Erreur lors de la lecture");
-    }
-
-    printf("Déconnexion du client.\n");
-
-    // Fermeture des sockets
-    close(client_fd);
+    
     close(server_fd);
-
     return 0;
 }
