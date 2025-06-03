@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system certificates -->
+            <certificates src="system" />
+            <!-- Trust user added certificates for debug builds -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Configuration pour mon serveur avec certificat auto-signé -->
+    <domain-config>
+        <domain includeSubdomains="true">192.168.0.31</domain>
+        <trust-anchors>
+            <certificates src="@raw/server_cert"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
